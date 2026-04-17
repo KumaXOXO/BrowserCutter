@@ -23,11 +23,23 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy to server
+      - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.DEPLOY_HOST }} "mkdir -p /var/www/browsercutter"
-          rsync -avz --delete -e "ssh -i ~/.ssh/id_ed25519" dist/ root@${{ secrets.DEPLOY_HOST }}:/var/www/browsercutter/
+          echo "Key written."
+
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            root@${{ secrets.DEPLOY_HOST }} "echo 'SSH OK'"
+
+      - name: Rsync dist to server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@${{ secrets.DEPLOY_HOST }} "mkdir -p /var/www/browsercutter"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            dist/ root@${{ secrets.DEPLOY_HOST }}:/var/www/browsercutter/
