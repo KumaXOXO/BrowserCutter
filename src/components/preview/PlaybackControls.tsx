@@ -23,6 +23,7 @@ export default function PlaybackControls() {
   }
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsPlaying(false)
     const rect = e.currentTarget.getBoundingClientRect()
     const ratio = (e.clientX - rect.left) / rect.width
     setPlayheadPosition(Math.max(0, Math.min(totalDuration, ratio * totalDuration)))

@@ -90,6 +90,11 @@ export default function VideoPreview() {
       if (!seg || !videoRef.current) return
 
       const rawTime = videoRef.current.currentTime
+      // Skip until seek settles after a segment switch to avoid backwards timecode jump
+      if (rawTime < seg.inPoint) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
       setPlayheadPosition(seg.startOnTimeline + (rawTime - seg.inPoint))
 
       if (rawTime >= seg.outPoint - 0.05) {
@@ -109,6 +114,10 @@ export default function VideoPreview() {
             videoRef.current.play().catch(() => {})
             activeSegRef.current = nextSeg
           } else {
+            if (objectUrlRef.current) {
+              URL.revokeObjectURL(objectUrlRef.current)
+              objectUrlRef.current = null
+            }
             setIsPlaying(false)
             return
           }
