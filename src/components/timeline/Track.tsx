@@ -23,10 +23,12 @@ export default function Track({ trackIndex, label, icon, height, zoom, trackLabe
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     const clipId = e.dataTransfer.getData('clipId')
+    if (!clipId) return
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return
 
     const rect = e.currentTarget.getBoundingClientRect()
+    // rect is the content div (right of the label) — no label-width offset needed
     const x = e.clientX - rect.left
     const startOnTimeline = Math.max(0, x / (PX_PER_SEC * zoom))
 
