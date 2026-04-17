@@ -20,22 +20,21 @@ export function generateCut(clips: Clip[], config: BpmConfig): Segment[] {
 function generateSequential(pool: Clip[], segDuration: number, totalSeconds: number): Segment[] {
   const segments: Segment[] = []
   const bookmarks: Record<string, number> = Object.fromEntries(pool.map((c) => [c.id, 0]))
+  const exhausted = new Set<string>()
   let timeline = 0
   let poolIndex = 0
-  let exhaustedCount = 0
 
-  while (timeline < totalSeconds - 0.001 && exhaustedCount < pool.length) {
+  while (timeline < totalSeconds - 0.001 && exhausted.size < pool.length) {
     const clip = pool[poolIndex % pool.length]
     const inPoint = bookmarks[clip.id]
     const remaining = clip.duration - inPoint
 
     if (remaining <= 0.001) {
+      exhausted.add(clip.id)
       poolIndex++
-      exhaustedCount++
       continue
     }
 
-    exhaustedCount = 0
     const duration = Math.min(segDuration, remaining, totalSeconds - timeline)
 
     segments.push({
@@ -96,8 +95,8 @@ function generateForfeit(pool: Clip[], segDuration: number, totalSeconds: number
   const segments: Segment[] = []
   const bookmarks: Record<string, number> = Object.fromEntries(pool.map((c) => [c.id, 0]))
 
-  let slotA = pool[0]
-  let slotB = pool.length > 1 ? pool[1] : pool[0]
+  let slotA: Clip | null = pool[0]
+  let slotB: Clip | null = pool.length > 1 ? pool[1] : null
   const remaining = pool.slice(2)
 
   let timeline = 0
@@ -105,14 +104,23 @@ function generateForfeit(pool: Clip[], segDuration: number, totalSeconds: number
 
   while (timeline < totalSeconds - 0.001) {
     const clip = turn === 0 ? slotA : slotB
+
+    if (!clip) {
+      // This slot is permanently gone — try the other
+      turn = 1 - turn
+      const other = turn === 0 ? slotA : slotB
+      if (!other) break // both slots empty
+      continue
+    }
+
     const inPoint = bookmarks[clip.id]
     const clipRemaining = clip.duration - inPoint
 
     if (clipRemaining <= 0.001) {
-      const next = remaining.shift()
-      if (!next) break
+      const next = remaining.shift() ?? null
       if (turn === 0) slotA = next
       else slotB = next
+      // Don't advance turn — retry this slot with the replacement (or null)
       continue
     }
 

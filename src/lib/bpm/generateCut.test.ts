@@ -91,6 +91,15 @@ describe('generateCut', () => {
     expect(ids).toContain('c')
   })
 
+  it('forfeit: continues from surviving slot when one slot exhausts with no replacement', () => {
+    const result = generateCut(
+      [makeClip('a', 0.5), makeClip('b', 10)],
+      { ...baseConfig, mode: 'forfeit', selectedClipIds: ['a', 'b'], outputDuration: 4 },
+    )
+    const end = Math.max(...result.map((s) => s.startOnTimeline + (s.outPoint - s.inPoint)))
+    expect(end).toBeCloseTo(4, 5)
+  })
+
   it('respects outputUnit beats', () => {
     const result = generateCut(clips, {
       ...baseConfig,
