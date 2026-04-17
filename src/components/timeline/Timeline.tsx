@@ -3,11 +3,15 @@ import { useState } from 'react'
 import { Film, Type, Volume2 } from 'lucide-react'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
+import { useAppStore } from '../../store/useAppStore'
+import { PX_PER_SEC } from './ClipBlock'
 
 const TRACK_LABEL_WIDTH = 78
 
 export default function Timeline() {
   const [zoom, setZoom] = useState(1)
+  const playheadPosition = useAppStore((s) => s.playheadPosition)
+  const playheadLeft = TRACK_LABEL_WIDTH + playheadPosition * PX_PER_SEC * zoom
 
   return (
     <div
@@ -30,15 +34,29 @@ export default function Timeline() {
             + Track
           </button>
         </div>
-        <input type="range" min={0.5} max={5} step={0.1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} style={{ width: 72, accentColor: '#E11D48', cursor: 'pointer' }} />
+        <input
+          type="range"
+          min={0.5}
+          max={5}
+          step={0.1}
+          value={zoom}
+          onChange={(e) => setZoom(Number(e.target.value))}
+          style={{ width: 72, accentColor: '#E11D48', cursor: 'pointer' }}
+        />
       </div>
 
       {/* Scrollable tracks */}
       <div className="flex-1 overflow-auto relative">
-        <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} />
+        <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} zoom={zoom} />
         <div style={{ position: 'relative' }}>
           {/* Playhead */}
-          <div style={{ position: 'absolute', top: 0, bottom: 0, left: TRACK_LABEL_WIDTH + 80, width: 1.5, background: '#E11D48', zIndex: 20, pointerEvents: 'none' }}>
+          <div
+            style={{
+              position: 'absolute', top: 0, bottom: 0,
+              left: playheadLeft,
+              width: 1.5, background: '#E11D48', zIndex: 20, pointerEvents: 'none',
+            }}
+          >
             <div style={{ position: 'absolute', top: -2, left: -5, width: 12, height: 8, background: '#E11D48', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', borderRadius: 2 }} />
           </div>
 

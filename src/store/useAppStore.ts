@@ -25,6 +25,7 @@ interface AppState {
   transitions: Transition[]
   textOverlays: TextOverlay[]
   playheadPosition: number  // seconds
+  isPlaying: boolean
 
   // ─── BPM tool ───
   bpmConfig: BpmConfig
@@ -43,9 +44,11 @@ interface AppState {
   removeSegment: (id: SegmentId) => void
   updateSegment: (id: SegmentId, patch: Partial<Segment>) => void
   addSegments: (segments: Segment[]) => void
+  replaceSegments: (segments: Segment[]) => void
 
   updateBpmConfig: (patch: Partial<BpmConfig>) => void
   setPlayheadPosition: (pos: number) => void
+  setIsPlaying: (playing: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -74,6 +77,7 @@ export const useAppStore = create<AppState>((set) => ({
   transitions: [],
   textOverlays: [],
   playheadPosition: 0,
+  isPlaying: false,
 
   // ─── BPM tool ───
   bpmConfig: {
@@ -100,9 +104,11 @@ export const useAppStore = create<AppState>((set) => ({
   removeSegment: (id) => set((s) => ({ segments: s.segments.filter((seg) => seg.id !== id) })),
   updateSegment: (id, patch) =>
     set((s) => ({ segments: s.segments.map((seg) => seg.id === id ? { ...seg, ...patch } : seg) })),
-  addSegments: (segments) => set((s) => ({ segments: [...s.segments, ...segments] })),
+  addSegments: (newSegs) => set((s) => ({ segments: [...s.segments, ...newSegs] })),
+  replaceSegments: (newSegs) => set({ segments: newSegs }),
 
   updateBpmConfig: (patch) =>
     set((s) => ({ bpmConfig: { ...s.bpmConfig, ...patch } })),
   setPlayheadPosition: (pos) => set({ playheadPosition: pos }),
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
 }))
