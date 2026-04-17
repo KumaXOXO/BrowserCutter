@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:       #07070F;
+  --surface:  #0E0E1C;
+  --surface2: #141428;
+  --border:   rgba(255,255,255,0.07);
+  --accent:   #E11D48;
+  --muted:    #5A5A7A;
+  --text:     #EEEEF8;
+
+  /* shadcn/ui CSS variables */
+  --background: 240 10% 4%;
+  --foreground: 240 10% 97%;
+  --card: 240 10% 7%;
+  --card-foreground: 240 10% 97%;
+  --popover: 240 10% 7%;
+  --popover-foreground: 240 10% 97%;
+  --primary: 346 77% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 10% 11%;
+  --secondary-foreground: 240 10% 97%;
+  --muted-foreground: 240 5% 55%;
+  --accent-foreground: 240 10% 97%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 240 10% 11%;
+  --ring: 346 77% 50%;
+  --radius: 0.5rem;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; overflow: hidden; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.65); }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(300%) skewX(-15deg); }
+}
+
+.inp {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  transition: border-color 180ms, box-shadow 180ms;
+  cursor: pointer;
+}
+.inp:focus { border-color: rgba(225,29,72,0.5); box-shadow: 0 0 0 3px rgba(225,29,72,0.1); }

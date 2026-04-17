@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrowserCutter — UI Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    :root {
+      --bg:        #07070F;
+      --surface:   #0E0E1C;
+      --surface2:  #141428;
+      --surface3:  #1C1C34;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.12);
+      --text:      #EEEEF8;
+      --muted:     #5A5A7A;
+      --muted2:    #888898;
+      --red:       #E11D48;
+      --red-dark:  #B01232;
+      --purple:    #7C3AED;
+      --cyan:      #0891B2;
+      --green:     #059669;
+      --amber:     #D97706;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ─── Buttons ─── */
+    .btn-primary {
+      background: linear-gradient(135deg, #E11D48 0%, #C41232 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      position: relative;
+      overflow: hidden;
+      transition: all 200ms cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 4px 15px rgba(225,29,72,0.35);
+      letter-spacing: -0.1px;
+    }
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 200ms;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(225,29,72,0.5); }
+    .btn-primary:hover::before { opacity: 1; }
+    .btn-primary:active { transform: scale(0.97) translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      padding: 7px 12px;
+      font-size: 12px;
+      color: var(--muted2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 180ms cubic-bezier(.4,0,.2,1);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: var(--text); background: rgba(255,255,255,0.05); }
+    .btn-ghost:active { transform: scale(0.97); }
+
+    .btn-icon {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 180ms cubic-bezier(.4,0,.2,1);
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+    .btn-icon:active { transform: scale(0.9); }
+
+    .btn-generate {
+      background: linear-gradient(135deg, #E11D48 0%, #9C1EAB 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+      transition: all 220ms cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 4px 20px rgba(225,29,72,0.4), 0 4px 20px rgba(156,30,171,0.2);
+      letter-spacing: 0.2px;
+    }
+    .btn-generate::after {
+      content: '';
+      position: absolute;
+      top: -50%; left: -60%;
+      width: 50%; height: 200%;
+      background: rgba(255,255,255,0.1);
+      transform: skewX(-20deg);
+      transition: left 400ms ease;
+    }
+    .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(225,29,72,0.55), 0 8px 28px rgba(156,30,171,0.35); }
+    .btn-generate:hover::after { left: 130%; }
+    .btn-generate:active { transform: scale(0.98) translateY(0); }
+
+    /* ─── Tab icons ─── */
+    .tab-icon {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 180ms cubic-bezier(.4,0,.2,1);
+      position: relative;
+      border: 1px solid transparent;
+    }
+    .tab-icon:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+    .tab-icon.active {
+      background: rgba(255,255,255,0.09);
+      color: var(--text);
+      border-color: var(--border2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .tab-icon.active-bpm {
+      background: rgba(225,29,72,0.12);
+      color: #F43F5E;
+      border-color: rgba(225,29,72,0.3);
+      box-shadow: 0 0 12px rgba(225,29,72,0.2);
+    }
+    .tab-icon.active-bpm:hover { box-shadow: 0 0 20px rgba(225,29,72,0.35); }
+    .tab-icon-dot {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    /* ─── Inputs ─── */
+    .inp {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 180ms, box-shadow 180ms;
+    }
+    .inp:focus { border-color: rgba(225,29,72,0.5); box-shadow: 0 0 0 3px rgba(225,29,72,0.1); }
+
+    select.inp { cursor: pointer; }
+    input[type=range] { accent-color: var(--red); cursor: pointer; }
+    input[type=checkbox], input[type=radio] { accent-color: var(--red); cursor: pointer; }
+
+    /* ─── Panels ─── */
+    .panel { display: none; flex-direction: column; height: 100%; overflow-y: auto; padding: 14px; gap: 14px; }
+    .panel.active { display: flex; }
+
+    .panel-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    /* ─── Media sub-tabs ─── */
+    .media-tab {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted2);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 150ms;
+      text-align: center;
+    }
+    .media-tab:hover { color: var(--text); }
+    .media-tab.active {
+      background: rgba(255,255,255,0.08);
+      border-color: var(--border2);
+      color: var(--text);
+    }
+
+    /* ─── Upload zone ─── */
+    .upload-zone {
+      border: 1.5px dashed rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 18px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 200ms cubic-bezier(.4,0,.2,1);
+    }
+    .upload-zone:hover {
+      border-color: rgba(225,29,72,0.5);
+      background: rgba(225,29,72,0.04);
+    }
+
+    /* ─── Clip thumbnails ─── */
+    .clip-thumb {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background: var(--surface2);
+      transition: all 200ms cubic-bezier(.4,0,.2,1);
+    }
+    .clip-thumb:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+
+    /* ─── Effect rows ─── */
+    .effect-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--muted2);
+      transition: all 150ms;
+      border: 1px solid transparent;
+    }
+    .effect-row:hover { background: rgba(255,255,255,0.05); color: var(--text); border-color: var(--border); }
+
+    /* ─── Transition cards ─── */
+    .trans-card {
+      padding: 12px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      text-align: center;
+      transition: all 180ms cubic-bezier(.4,0,.2,1);
+      background: var(--surface2);
+    }
+    .trans-card:hover { border-color: rgba(225,29,72,0.5); background: rgba(225,29,72,0.05); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+    .trans-card:active { transform: scale(0.96); }
+
+    /* ─── BPM mode cards ─── */
+    .mode-card {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 180ms;
+      background: var(--surface2);
+    }
+    .mode-card:hover { border-color: rgba(255,255,255,0.15); background: var(--surface3); }
+    .mode-card.selected { border-color: rgba(225,29,72,0.5); background: rgba(225,29,72,0.06); box-shadow: 0 0 0 1px rgba(225,29,72,0.15); }
+
+    /* ─── Timeline ─── */
+    .clip-block {
+      position: absolute; top: 4px; bottom: 4px;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex; align-items: center;
+      overflow: hidden;
+      transition: filter 120ms, transform 120ms;
+    }
+    .clip-block:hover { filter: brightness(1.2); }
+    .clip-block.selected { outline: 2px solid rgba(255,255,255,0.9); outline-offset: 1px; }
+    .clip-block span { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); padding: 0 7px; white-space: nowrap; letter-spacing: 0.3px; }
+
+    .playhead { position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--red); pointer-events: none; z-index: 20; }
+    .playhead::before { content: ''; position: absolute; top: -2px; left: -5px; width: 12px; height: 8px; background: var(--red); clip-path: polygon(0 0, 100% 0, 50% 100%); border-radius: 2px; }
+
+    /* ─── Inspector ─── */
+    .inspector-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; display: block; }
+
+    /* ─── Settings ─── */
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-row:last-child { border-bottom: none; }
+
+    .toggle {
+      width: 34px; height: 19px;
+      background: var(--surface3);
+      border-radius: 99px;
+      position: relative;
+      cursor: pointer;
+      transition: background 200ms;
+      border: 1px solid var(--border2);
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: var(--muted2);
+      transition: all 200ms cubic-bezier(.4,0,.2,1);
+    }
+    .toggle.on { background: var(--red); border-color: var(--red); }
+    .toggle.on::after { left: 17px; background: white; box-shadow: 0 2px 6px rgba(225,29,72,0.5); }
+
+    /* ─── Animations ─── */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%) skewX(-15deg); }
+      100% { transform: translateX(300%) skewX(-15deg); }
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .panel.active { animation: fadeIn 150ms ease; }
+
+    /* Glass card effect */
+    .glass {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+    }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+    /* Top bar project name */
+    .proj-name {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      color: var(--muted2);
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+      width: 170px;
+      transition: all 150ms;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .proj-name:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .proj-name:focus { color: var(--text); background: rgba(255,255,255,0.06); }
+
+    /* Media music list */
+    .music-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 150ms;
+      border: 1px solid transparent;
+    }
+    .music-row:hover { background: var(--surface2); border-color: var(--border); }
+
+    /* Scrollbar thin */
+    .thin-scroll { overflow-y: auto; }
+    .thin-scroll::-webkit-scrollbar { width: 3px; }
+  </style>
+</head>
+<body style="height:100vh;">
+
+  <!-- ═══ TOP BAR ═══ -->
+  <div style="height:48px; min-height:48px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 12px; gap:12px;">
+
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      <!-- Logo -->
+      <div style="width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,#E11D48,#9C1EAB); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(225,29,72,0.4); flex-shrink:0;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/>
+          <line x1="6" y1="8.5" x2="6" y2="21"/><line x1="18" y1="3" x2="18" y2="15.5"/>
+          <line x1="6" y1="14" x2="18" y2="10"/>
+        </svg>
+      </div>
+      <span style="font-weight:700; font-size:14px; letter-spacing:-0.5px; background:linear-gradient(90deg,#EEEEF8,#A8A8C8); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">BrowserCutter</span>
+      <div style="width:1px; height:18px; background:var(--border2);"></div>
+      <input class="proj-name" value="Untitled Project" />
+    </div>
+
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button class="btn-icon" title="Undo">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button class="btn-icon" title="Redo">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 9.5 20H13"/></svg>
+      </button>
+      <div style="width:1px; height:18px; background:var(--border2); margin:0 4px;"></div>
+      <button class="btn-ghost" style="display:flex; align-items:center; gap:6px; padding:6px 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        Save
+      </button>
+      <button class="btn-primary" onclick="alert('Export dialog')">Export Video</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN ═══ -->
+  <div style="flex:1; display:flex; overflow:hidden;">
+
+    <!-- ─── ICON SIDEBAR ─── -->
+    <div style="width:50px; min-width:50px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:4px;">
+
+      <div class="tab-icon active" id="icon-media" onclick="setTab('media')" title="Media">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4V8z"/></svg>
+      </div>
+
+      <div class="tab-icon" id="icon-text" onclick="setTab('text')" title="Text & Subtitles">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+      </div>
+
+      <div class="tab-icon" id="icon-effects" onclick="setTab('effects')" title="Effects">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+      </div>
+
+      <div class="tab-icon" id="icon-transitions" onclick="setTab('transitions')" title="Transitions">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </div>
+
+      <div class="tab-icon" id="icon-bpm" onclick="setTab('bpm')" title="BPM Cutting Tool" style="margin-top:4px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4M6 8v8M10 5v14M14 9v6M18 7v10M22 12h-4"/></svg>
+        <span class="tab-icon-dot"></span>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <div class="tab-icon" id="icon-settings" onclick="setTab('settings')" title="Settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+    </div>
+
+    <!-- ─── LEFT PANEL ─── -->
+    <div style="width:284px; min-width:284px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden;">
+
+      <!-- MEDIA PANEL -->
+      <div class="panel active" id="panel-media">
+        <span class="panel-label">Media</span>
+
+        <!-- Sub-tabs -->
+        <div style="display:flex; gap:4px; background:var(--surface2); border-radius:8px; padding:3px;">
+          <button class="media-tab active" id="mtab-videos" onclick="setMediaTab('videos')">Videos</button>
+          <button class="media-tab" id="mtab-music" onclick="setMediaTab('music')">Music</button>
+          <button class="media-tab" id="mtab-images" onclick="setMediaTab('images')">Images</button>
+        </div>
+
+        <!-- Videos sub-panel -->
+        <div id="msub-videos" style="display:flex; flex-direction:column; gap:12px; flex:1;">
+          <div class="upload-zone" onclick="alert('File picker')">
+            <svg style="margin:0 auto 8px; color:var(--muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <p style="font-size:12px; color:var(--muted2);">Drop videos or <span style="color:var(--red);">browse</span></p>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="clip-thumb" onclick="selectClip('A')">
+              <div style="aspect-ratio:16/9; background:linear-gradient(135deg,#3B1F8C44,#7C3AED22); display:flex; align-items:center; justify-content:center; position:relative;">
+                <div style="width:26px;height:26px;background:rgba(124,58,237,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </div>
+                <span style="position:absolute;bottom:4px;right:5px;font-size:9px;font-family:monospace;background:rgba(0,0,0,0.7);padding:1px 4px;border-radius:3px;color:white;">08:24</span>
+              </div>
+              <div style="padding:6px 8px;">
+                <p style="font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">clip_A.mp4</p>
+                <p style="font-size:10px; color:var(--muted);">1920×1080</p>
+              </div>
+            </div>
+            <div class="clip-thumb" onclick="selectClip('B')">
+              <div style="aspect-ratio:16/9; background:linear-gradient(135deg,#0C4A6E44,#0891B222); display:flex; align-items:center; justify-content:center; position:relative;">
+                <div style="width:26px;height:26px;background:rgba(8,145,178,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </div>
+                <span style="position:absolute;bottom:4px;right:5px;font-size:9px;font-family:monospace;background:rgba(0,0,0,0.7);padding:1px 4px;border-radius:3px;color:white;">12:07</span>
+              </div>
+              <div style="padding:6px 8px;">
+                <p style="font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">clip_B.mp4</p>
+                <p style="font-size:10px; color:var(--muted);">1920×1080</p>
+              </div>
+            </div>
+            <div class="clip-thumb" onclick="selectClip('C')">
+              <div style="aspect-ratio:16/9; background:linear-gradient(135deg,#064E3B44,#05966922); display:flex; align-items:center; justify-content:center; position:relative;">
+                <div style="width:26px;height:26px;background:rgba(5,150,105,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </div>
+                <span style="position:absolute;bottom:4px;right:5px;font-size:9px;font-family:monospace;background:rgba(0,0,0,0.7);padding:1px 4px;border-radius:3px;color:white;">15:33</span>
+              </div>
+              <div style="padding:6px 8px;">
+                <p style="font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">clip_C.mp4</p>
+                <p style="font-size:10px; color:var(--muted);">3840×2160</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Music sub-panel -->
+        <div id="msub-music" style="display:none; flex-direction:column; gap:12px; flex:1;">
+          <div class="upload-zone">
+            <svg style="margin:0 auto 8px; color:var(--muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <p style="font-size:12px; color:var(--muted2);">Drop audio or <span style="color:var(--red);">browse</span></p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div class="music-row">
+              <div style="width:32px;height:32px;background:rgba(225,29,72,0.15);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E11D48" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <p style="font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">track_01.mp3</p>
+                <p style="font-size:10px; color:var(--muted);">03:42 · 128 BPM</p>
+              </div>
+              <button class="btn-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+            </div>
+            <div class="music-row">
+              <div style="width:32px;height:32px;background:rgba(124,58,237,0.15);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <p style="font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">background_loop.wav</p>
+                <p style="font-size:10px; color:var(--muted);">01:00 · 140 BPM</p>
+              </div>
+              <button class="btn-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Images sub-panel -->
+        <div id="msub-images" style="display:none; flex-direction:column; gap:12px; flex:1;">
+          <div class="upload-zone">
+            <svg style="margin:0 auto 8px; color:var(--muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <p style="font-size:12px; color:var(--muted2);">Drop images or <span style="color:var(--red);">browse</span></p>
+          </div>
+          <p style="font-size:12px; color:var(--muted); text-align:center;">No images added yet</p>
+        </div>
+      </div>
+
+      <!-- TEXT PANEL -->
+      <div class="panel" id="panel-text">
+        <span class="panel-label">Text & Subtitles</span>
+        <button class="btn-ghost" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; width:100%;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Add Text Overlay
+        </button>
+        <button class="btn-ghost" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; width:100%;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Import .srt File
+        </button>
+        <div class="divider"></div>
+        <p style="font-size:12px; color:var(--muted);">No text or subtitles added yet.</p>
+      </div>
+
+      <!-- EFFECTS PANEL -->
+      <div class="panel" id="panel-effects">
+        <span class="panel-label">Effects</span>
+        <p style="font-size:11px; color:var(--muted);">Click to apply to selected clip</p>
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>Brightness / Exposure</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z"/></svg>Contrast</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 9-2 2 2 2M15 9l2 2-2 2M11 21l2-18"/></svg>Saturation</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5V7H2z"/></svg>Black & White</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>Blur</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>Vignette</div>
+          <div class="effect-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.5 8.5 9 12l-3.5 3.5L2 12zM12 2l3.5 3.5L12 9 8.5 5.5zM18.5 8.5 22 12l-3.5 3.5L15 12zM12 15l3.5 3.5L12 22l-3.5-3.5z"/></svg>Sharpen</div>
+        </div>
+        <div style="padding-top:10px; border-top:1px solid var(--border);">
+          <p class="panel-label" style="margin-bottom:8px;">Adjustment Layer</p>
+          <button class="btn-ghost" style="width:100%; padding:9px; display:flex; align-items:center; justify-content:center; gap:6px; color:#EF4444; border-color:rgba(239,68,68,0.25);" onmouseover="this.style.borderColor='rgba(239,68,68,0.5)';this.style.background='rgba(239,68,68,0.06)'" onmouseout="this.style.borderColor='rgba(239,68,68,0.25)';this.style.background='transparent'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Add Adjustment Layer
+          </button>
+        </div>
+      </div>
+
+      <!-- TRANSITIONS PANEL -->
+      <div class="panel" id="panel-transitions">
+        <span class="panel-label">Transitions</span>
+        <p style="font-size:11px; color:var(--muted);">Drag between two clips on the timeline</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="trans-card"><div style="font-size:16px; margin-bottom:5px; color:var(--muted);">▶</div><p style="font-size:11px; font-weight:500;">Cut</p></div>
+          <div class="trans-card"><div style="font-size:10px; font-family:monospace; margin-bottom:5px; color:var(--muted); letter-spacing:2px;">A→B</div><p style="font-size:11px; font-weight:500;">Fade</p></div>
+          <div class="trans-card"><div style="font-size:14px; margin-bottom:5px; color:var(--muted);">|→</div><p style="font-size:11px; font-weight:500;">Wipe</p></div>
+          <div class="trans-card"><div style="font-size:13px; margin-bottom:5px; color:var(--muted);">⊕</div><p style="font-size:11px; font-weight:500;">Zoom</p></div>
+          <div class="trans-card"><div style="font-size:10px; font-family:monospace; margin-bottom:5px; color:var(--muted);">↗↘</div><p style="font-size:11px; font-weight:500;">Slide</p></div>
+          <div class="trans-card"><div style="font-size:13px; margin-bottom:5px; color:var(--muted);">◈</div><p style="font-size:11px; font-weight:500;">Dissolve</p></div>
+        </div>
+      </div>
+
+      <!-- BPM PANEL -->
+      <div class="panel thin-scroll" id="panel-bpm" style="gap:16px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="tab-icon-dot" style="position:static; width:7px; height:7px;"></span>
+          <span style="font-size:11px; font-weight:700; color:#F43F5E; text-transform:uppercase; letter-spacing:.1em;">BPM Cutting Tool</span>
+        </div>
+
+        <!-- Select clips -->
+        <div class="glass" style="padding:12px; gap:8px; display:flex; flex-direction:column;">
+          <p class="panel-label">Select Source Clips</p>
+          <label style="display:flex; align-items:center; gap:9px; cursor:pointer; padding:6px 0; font-size:12px;">
+            <input type="checkbox" checked>
+            <span style="width:9px;height:9px;border-radius:2px;background:#7C3AED;flex-shrink:0;"></span> clip_A.mp4
+            <span style="margin-left:auto; font-size:10px; color:var(--muted);">08:24</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:9px; cursor:pointer; padding:6px 0; font-size:12px;">
+            <input type="checkbox" checked>
+            <span style="width:9px;height:9px;border-radius:2px;background:#0891B2;flex-shrink:0;"></span> clip_B.mp4
+            <span style="margin-left:auto; font-size:10px; color:var(--muted);">12:07</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:9px; cursor:pointer; padding:6px 0; font-size:12px;">
+            <input type="checkbox" checked>
+            <span style="width:9px;height:9px;border-radius:2px;background:#059669;flex-shrink:0;"></span> clip_C.mp4
+            <span style="margin-left:auto; font-size:10px; color:var(--muted);">15:33</span>
+          </label>
+        </div>
+
+        <!-- BPM -->
+        <div>
+          <p class="panel-label" style="margin-bottom:8px;">BPM</p>
+          <div style="display:flex; gap:8px;">
+            <input type="number" value="128" class="inp" style="width:75px;"/>
+            <button class="btn-ghost" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px; font-size:11px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Auto-Detect
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode -->
+        <div>
+          <p class="panel-label" style="margin-bottom:8px;">Cutting Mode</p>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="mode-card" onclick="setMode(this)">
+              <input type="radio" name="bpm-mode" style="margin-top:2px;">
+              <div>
+                <p style="font-size:12px; font-weight:500;">Sequential</p>
+                <p style="font-size:10px; color:var(--muted); font-family:monospace; margin-top:2px;">A→B→C→A→B→C</p>
+              </div>
+            </div>
+            <div class="mode-card selected" onclick="setMode(this)">
+              <input type="radio" name="bpm-mode" checked style="margin-top:2px;">
+              <div>
+                <p style="font-size:12px; font-weight:500;">Random</p>
+                <p style="font-size:10px; color:var(--muted); font-family:monospace; margin-top:2px;">ACBBA...</p>
+              </div>
+            </div>
+            <div class="mode-card" onclick="setMode(this)">
+              <input type="radio" name="bpm-mode" style="margin-top:2px;">
+              <div>
+                <p style="font-size:12px; font-weight:500;">Forfeit</p>
+                <p style="font-size:10px; color:var(--muted); font-family:monospace; margin-top:2px;">AB→BC→CD</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Segment + Output -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <p class="panel-label" style="margin-bottom:6px;">Segment</p>
+            <select class="inp" style="cursor:pointer;">
+              <option>½ Beat</option><option selected>1 Beat</option><option>2 Beats</option><option>4 Beats</option>
+            </select>
+          </div>
+          <div>
+            <p class="panel-label" style="margin-bottom:6px;">Output</p>
+            <div style="display:flex; gap:4px;">
+              <input type="number" value="30" class="inp" style="width:48px;"/>
+              <select class="inp" style="cursor:pointer; padding:7px 4px;">
+                <option>sec</option><option>beats</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-generate" onclick="alert('Generating BPM cut...')">Generate Cut</button>
+      </div>
+
+      <!-- SETTINGS PANEL -->
+      <div class="panel" id="panel-settings">
+        <span class="panel-label">Settings</span>
+        <div style="display:flex; flex-direction:column; gap:0;">
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Resolution</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">Output video size</p>
+            </div>
+            <select class="inp" style="width:110px; font-size:11px;">
+              <option>1920×1080</option><option>3840×2160</option><option>1280×720</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Frame Rate</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">FPS</p>
+            </div>
+            <select class="inp" style="width:80px; font-size:11px;">
+              <option>24fps</option><option selected>30fps</option><option>60fps</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Format</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">Export format</p>
+            </div>
+            <select class="inp" style="width:80px; font-size:11px;">
+              <option>MP4</option><option>WebM</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Auto-detect BPM</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">On upload</p>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Snap to Beat</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">Timeline snapping</p>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <p style="font-size:13px; font-weight:500;">Hardware Accel.</p>
+              <p style="font-size:11px; color:var(--muted); margin-top:1px;">GPU when available</p>
+            </div>
+            <div class="toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSPECTOR PANEL -->
+      <div class="panel" id="panel-inspector">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span class="panel-label">Inspector</span>
+          <span id="inspector-label" style="font-size:11px; font-weight:600; padding:2px 9px; border-radius:5px; background:rgba(124,58,237,0.15); color:#A78BFA;">clip_B.mp4</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div><label class="inspector-label">In Point</label><input type="text" value="00:01:12.08" class="inp"/></div>
+            <div><label class="inspector-label">Out Point</label><input type="text" value="00:01:17.08" class="inp"/></div>
+          </div>
+          <div><label class="inspector-label">Duration</label><input type="text" value="00:00:05.00" class="inp" readonly style="opacity:.5;cursor:default;"/></div>
+          <div class="divider"></div>
+          <div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><label class="inspector-label">Volume</label><span style="font-size:11px; color:var(--muted);">100%</span></div>
+            <input type="range" min="0" max="100" value="100" style="width:100%;"/>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><label class="inspector-label">Speed</label><span style="font-size:11px; color:var(--muted);">1.0×</span></div>
+            <input type="range" min="25" max="400" value="100" style="width:100%;"/>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <label class="inspector-label" style="margin-bottom:8px; display:block;">Applied Effects</label>
+            <p style="font-size:12px; color:var(--muted);">No effects applied.</p>
+            <button class="btn-ghost" style="margin-top:8px; font-size:11px; color:var(--red); border-color:rgba(225,29,72,0.25); padding:5px 10px;" onmouseover="this.style.background='rgba(225,29,72,0.06)';this.style.borderColor='rgba(225,29,72,0.5)'" onmouseout="this.style.background='transparent';this.style.borderColor='rgba(225,29,72,0.25)'">+ Add Effect</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ─── RIGHT SIDE ─── -->
+    <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+
+      <!-- VIDEO PREVIEW -->
+      <div style="flex:1; background:#05050C; display:flex; align-items:center; justify-content:center; min-height:0; padding:20px;">
+        <div style="position:relative; aspect-ratio:16/9; max-height:100%; max-width:100%; border-radius:6px; overflow:hidden; box-shadow:0 0 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);">
+          <div style="position:absolute; inset:0; background:linear-gradient(135deg, #12122A 0%, #0A0A1A 50%, #12122A 100%); display:flex; align-items:center; justify-content:center;">
+            <div style="text-align:center;">
+              <svg style="margin:0 auto 12px; opacity:0.15;" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4V8z"/></svg>
+              <p style="font-size:12px; color:rgba(255,255,255,0.2); font-weight:400;">Drag a clip to the timeline</p>
+            </div>
+          </div>
+          <div style="position:absolute; bottom:10px; right:10px; padding:2px 8px; border-radius:4px; font-size:10px; font-family:monospace; background:rgba(0,0,0,0.6); color:rgba(255,255,255,0.6); backdrop-filter:blur(4px);">00:00:00</div>
+        </div>
+      </div>
+
+      <!-- PLAYBACK CONTROLS -->
+      <div style="height:46px; min-height:46px; background:var(--surface); border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; padding:0 16px;">
+        <button class="btn-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="m20 18-10-6 10-6v12z"/><path d="M7 6H5v12h2V6z"/></svg>
+        </button>
+        <button style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#E11D48,#C41232); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 200ms; box-shadow:0 3px 10px rgba(225,29,72,0.4); flex-shrink:0;" onmouseover="this.style.transform='scale(1.08)';this.style.boxShadow='0 5px 16px rgba(225,29,72,0.6)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 3px 10px rgba(225,29,72,0.4)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="btn-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="m4 18 10-6L4 6v12z"/><path d="M17 6h2v12h-2V6z"/></svg>
+        </button>
+        <span style="font-size:11px; font-family:monospace; color:var(--muted); white-space:nowrap;">00:00:00</span>
+        <div style="flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,0.08); position:relative; cursor:pointer; transition:height 150ms;" onmouseover="this.style.height='5px'" onmouseout="this.style.height='3px'">
+          <div style="width:30%; height:100%; border-radius:2px; background:linear-gradient(90deg,#E11D48,#F43F5E);"></div>
+          <div style="position:absolute; top:50%; transform:translateY(-50%); left:30%; width:11px; height:11px; border-radius:50%; background:#E11D48; margin-left:-5.5px; box-shadow:0 0 0 2px rgba(225,29,72,0.3);"></div>
+        </div>
+        <span style="font-size:11px; font-family:monospace; color:var(--muted); white-space:nowrap;">00:30:00</span>
+        <button class="btn-icon" style="margin-left:4px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        </button>
+      </div>
+
+      <!-- TIMELINE -->
+      <div style="height:205px; min-height:205px; background:var(--bg); border-top:1px solid var(--border); display:flex; flex-direction:column;">
+        <!-- Toolbar -->
+        <div style="height:30px; min-height:30px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.07em;">Timeline</span>
+            <button class="btn-ghost" style="padding:2px 8px; font-size:10px;">+ Track</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 3 3 5M19 3l2 2M5 21l-2-2M19 21l2-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            <input type="range" min="1" max="10" value="3" style="width:68px; accent-color:var(--red); cursor:pointer;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+          </div>
+        </div>
+
+        <!-- Tracks -->
+        <div style="flex:1; overflow:auto; position:relative;">
+          <!-- Ruler -->
+          <div style="display:flex; position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border);">
+            <div style="min-width:78px; width:78px; flex-shrink:0;"></div>
+            <div style="display:flex; font-size:9px; font-family:monospace; color:#35354A; padding:4px 0; flex-shrink:0; user-select:none;">
+              <span style="width:100px; padding-left:4px;">0:00</span><span style="width:100px; padding-left:4px;">0:05</span>
+              <span style="width:100px; padding-left:4px;">0:10</span><span style="width:100px; padding-left:4px;">0:15</span>
+              <span style="width:100px; padding-left:4px;">0:20</span><span style="width:100px; padding-left:4px;">0:25</span>
+              <span style="width:100px; padding-left:4px;">0:30</span>
+            </div>
+          </div>
+
+          <div style="position:relative;">
+            <!-- Playhead -->
+            <div class="playhead" style="left:243px;"></div>
+
+            <!-- Adjustment track -->
+            <div style="display:flex; align-items:center; height:26px; border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div style="min-width:78px; width:78px; padding:0 8px; font-size:10px; color:rgba(239,68,68,0.5); display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18"/></svg> Adj
+              </div>
+              <div style="position:relative; height:100%; width:700px; flex-shrink:0;">
+                <div style="position:absolute; top:3px; bottom:3px; left:182px; width:222px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.35); border-radius:4px; display:flex; align-items:center; padding:0 7px;">
+                  <span style="font-size:9px; color:rgba(239,68,68,0.8); font-weight:600; letter-spacing:.3px;">Blur + Color Grade</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- V1 track -->
+            <div style="display:flex; align-items:center; height:38px; border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div style="min-width:78px; width:78px; padding:0 8px; font-size:10px; color:var(--muted); display:flex; align-items:center; gap:5px; flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 3l-4 4-4-4"/></svg> V1
+              </div>
+              <div style="position:relative; height:100%; width:700px; flex-shrink:0;">
+                <div class="clip-block" onclick="selectClip('A')" style="left:0; width:84px; background:linear-gradient(135deg,#5B21B6,#7C3AED);"><span>A</span></div>
+                <div class="clip-block" onclick="selectClip('B')" style="left:88px; width:68px; background:linear-gradient(135deg,#0C5F78,#0891B2);"><span>B</span></div>
+                <div class="clip-block" onclick="selectClip('A')" style="left:160px; width:80px; background:linear-gradient(135deg,#5B21B6,#7C3AED);"><span>A</span></div>
+                <div class="clip-block selected" onclick="selectClip('B')" style="left:244px; width:68px; background:linear-gradient(135deg,#0C5F78,#0891B2);"><span>B</span></div>
+                <div class="clip-block" onclick="selectClip('C')" style="left:316px; width:80px; background:linear-gradient(135deg,#065F46,#059669);"><span>C</span></div>
+                <div class="clip-block" onclick="selectClip('A')" style="left:400px; width:68px; background:linear-gradient(135deg,#5B21B6,#7C3AED);"><span>A</span></div>
+                <div class="clip-block" onclick="selectClip('C')" style="left:472px; width:90px; background:linear-gradient(135deg,#065F46,#059669);"><span>C</span></div>
+              </div>
+            </div>
+
+            <!-- Text track -->
+            <div style="display:flex; align-items:center; height:26px; border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div style="min-width:78px; width:78px; padding:0 8px; font-size:10px; color:var(--muted); display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg> Text
+              </div>
+              <div style="position:relative; height:100%; width:700px; flex-shrink:0;">
+                <div style="position:absolute; top:3px; bottom:3px; left:142px; width:128px; background:linear-gradient(135deg,#92400E,#D97706); border-radius:4px; display:flex; align-items:center; padding:0 7px; cursor:pointer;">
+                  <span style="font-size:9px; color:white; font-weight:600; white-space:nowrap; overflow:hidden;">Title text</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Audio track -->
+            <div style="display:flex; align-items:center; height:26px;">
+              <div style="min-width:78px; width:78px; padding:0 8px; font-size:10px; color:var(--muted); display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg> Audio
+              </div>
+              <div style="position:relative; height:18px; width:700px; flex-shrink:0; margin:4px 0; border-radius:4px; overflow:hidden; background:#0A1A12;">
+                <div style="position:absolute; inset:0; background:repeating-linear-gradient(90deg,#1A4A2A 0,#2E7040 3px,#1A4A2A 6px); opacity:.65;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const clipMeta = {
+      A: { label:'clip_A.mp4', bg:'rgba(124,58,237,0.15)', color:'#A78BFA' },
+      B: { label:'clip_B.mp4', bg:'rgba(8,145,178,0.15)',  color:'#38BDF8' },
+      C: { label:'clip_C.mp4', bg:'rgba(5,150,105,0.15)',  color:'#34D399' },
+    };
+
+    function setTab(name) {
+      document.querySelectorAll('.tab-icon').forEach(el => el.classList.remove('active','active-bpm'));
+      document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+      const icon = document.getElementById('icon-' + name);
+      icon.classList.add(name === 'bpm' ? 'active-bpm' : 'active');
+      document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    function setMediaTab(name) {
+      ['videos','music','images'].forEach(t => {
+        document.getElementById('msub-' + t).style.display = t === name ? 'flex' : 'none';
+        document.getElementById('mtab-' + t).classList.toggle('active', t === name);
+      });
+    }
+
+    function selectClip(clip) {
+      document.querySelectorAll('.clip-block').forEach(el => el.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+      const m = clipMeta[clip];
+      document.getElementById('inspector-label').textContent = m.label;
+      document.getElementById('inspector-label').style.background = m.bg;
+      document.getElementById('inspector-label').style.color = m.color;
+      setTab('inspector');
+    }
+
+    function setMode(card) {
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      card.querySelector('input[type=radio]').checked = true;
+    }
+
+    setTab('media');
+  </script>
+</body>
+</html>

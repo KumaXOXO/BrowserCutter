@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__firecrawl-mcp__firecrawl_scrape",
+      "WebFetch(domain:www.veed.io)",
+      "WebFetch(domain:online-video-cutter.com)",
+      "mcp__firecrawl-mcp__firecrawl_search",
+      "mcp__ccs-websearch__WebSearch",
+      "WebFetch(domain:bettercuttercc.vercel.app)",
+      "WebFetch(domain:bettercutter.cc)",
+      "WebFetch(domain:browsercutter.xyz)",
+      "WebFetch(domain:www.browsercutter.xyz)",
+      "Bash(python3 \"C:\\\\Users\\\\Administrator\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"video editor dark professional creative tool dashboard\" --design-system --persist -p \"BrowserCutter\")",
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(python \"C:\\\\Users\\\\Administrator\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"video editor dark professional creative tool dashboard\" --design-system --persist -p \"BrowserCutter\")",
+      "Bash(python \"C:\\\\Users\\\\Administrator\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"video editor timeline panel dark\" --domain style)",
+      "Bash(python \"C:\\\\Users\\\\Administrator\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"layout responsive\" --stack shadcn)",
+      "Bash(npm --version)",
+      "Bash(npx create-vite@latest . --template react-ts)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(timeout 15 npx vite --port 5173)"
+    ]
+  }
+}
