@@ -1,10 +1,12 @@
 // src/lib/video/thumbnail.ts
 
 export function generateThumbnail(video: HTMLVideoElement): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const seekTo = Math.min(1, video.duration * 0.1)
+    const timeout = setTimeout(() => reject(new Error('Thumbnail generation timed out')), 5000)
     video.currentTime = seekTo
     video.onseeked = () => {
+      clearTimeout(timeout)
       const canvas = document.createElement('canvas')
       canvas.width  = 320
       canvas.height = Math.round(320 / (video.videoWidth / video.videoHeight))

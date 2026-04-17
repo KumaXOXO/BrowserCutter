@@ -36,8 +36,12 @@ export async function fileToClip(file: File): Promise<Clip> {
   const id = uuidv4()
 
   if (type === 'video') {
-    const { duration, width, height, thumbnail } = await getVideoMeta(file)
-    return { id, file, name: file.name, duration, width, height, type, thumbnail }
+    try {
+      const { duration, width, height, thumbnail } = await getVideoMeta(file)
+      return { id, file, name: file.name, duration, width, height, type, thumbnail }
+    } catch {
+      return { id, file, name: file.name, duration: 0, width: 0, height: 0, type }
+    }
   }
 
   if (type === 'audio') {
