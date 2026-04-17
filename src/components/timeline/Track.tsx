@@ -1,6 +1,6 @@
 // src/components/timeline/Track.tsx
 import { useAppStore } from '../../store/useAppStore'
-import ClipBlock from './ClipBlock'
+import ClipBlock, { PX_PER_SEC } from './ClipBlock'
 
 interface Props {
   trackIndex: number
@@ -12,8 +12,33 @@ interface Props {
 }
 
 export default function Track({ trackIndex, label, icon, height, zoom, trackLabelWidth }: Props) {
-  const { segments, clips } = useAppStore()
+  const { segments, clips, addSegment } = useAppStore()
   const trackSegments = segments.filter((s) => s.trackIndex === trackIndex)
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const clipId = e.dataTransfer.getData('clipId')
+    const clip = clips.find((c) => c.id === clipId)
+    if (!clip) return
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const startOnTimeline = Math.max(0, x / (PX_PER_SEC * zoom))
+
+    addSegment({
+      id: crypto.randomUUID(),
+      clipId,
+      trackIndex,
+      startOnTimeline,
+      inPoint: 0,
+      outPoint: clip.duration,
+    })
+  }
 
   return (
     <div
@@ -26,7 +51,12 @@ export default function Track({ trackIndex, label, icon, height, zoom, trackLabe
       >
         {icon} {label}
       </div>
-      <div className="relative h-full" style={{ width: 700 }}>
+      <div
+        className="relative h-full"
+        style={{ width: 700 }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         {trackSegments.map((seg) => {
           const clip = clips.find((c) => c.id === seg.clipId)
           return clip ? <ClipBlock key={seg.id} segment={seg} clip={clip} zoom={zoom} /> : null

@@ -17,7 +17,9 @@ export default function VideoGrid({ clips }: { clips: Clip[] }) {
 function VideoThumb({ clip }: { clip: Clip }) {
   return (
     <div
-      className="rounded-lg overflow-hidden cursor-pointer transition-all duration-200"
+      draggable
+      onDragStart={(e) => e.dataTransfer.setData('clipId', clip.id)}
+      className="rounded-lg overflow-hidden cursor-grab transition-all duration-200"
       style={{ background: 'var(--surface2)', border: '1px solid var(--border-subtle)' }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)' }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
