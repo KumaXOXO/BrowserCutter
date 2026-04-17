@@ -8,6 +8,8 @@
   --bg:      #07070F;
   --surface:  #0E0E1C;
   --surface2: #141428;
+  --surface3: #1C1C34;
+  --muted2:   #888898;
   --text:     #EEEEF8;
 
   /* Renamed design tokens — matched to new Tailwind token names */
