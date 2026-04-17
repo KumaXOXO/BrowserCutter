@@ -1,7 +1,9 @@
 // src/components/panels/BpmPanel.tsx
+import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { PanelLabel } from './TextPanel'
 import type { BpmMode, SegmentLength } from '../../types'
+import { detectBpm } from '../../lib/audio/bpmDetector'
 
 const MODES: { id: BpmMode; label: string; example: string }[] = [
   { id: 'sequential', label: 'Sequential', example: 'A→B→C→A→B→C' },
@@ -18,6 +20,7 @@ const SEGMENT_LENGTHS: { value: SegmentLength; label: string }[] = [
 
 export default function BpmPanel() {
   const { bpmConfig, clips, updateBpmConfig } = useAppStore()
+  const [detecting, setDetecting] = useState(false)
   const videoClips = clips.filter((c) => c.type === 'video')
 
   return (
@@ -66,12 +69,40 @@ export default function BpmPanel() {
           />
           <button
             className="flex-1 rounded-lg text-xs cursor-pointer transition-all duration-150"
-            style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: 'var(--muted2)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(225,29,72,0.5)'; e.currentTarget.style.color = 'var(--text)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'var(--muted2)' }}
-            onClick={() => alert('BPM detection — Phase 2')}
+            style={{
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'transparent',
+              color: detecting ? 'var(--muted-subtle)' : 'var(--muted2)',
+              cursor: detecting ? 'wait' : 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (!detecting) {
+                e.currentTarget.style.borderColor = 'rgba(225,29,72,0.5)'
+                e.currentTarget.style.color = 'var(--text)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+              e.currentTarget.style.color = detecting ? 'var(--muted-subtle)' : 'var(--muted2)'
+            }}
+            disabled={detecting}
+            onClick={async () => {
+              const targetClip = clips.find(
+                (c) => bpmConfig.selectedClipIds.includes(c.id) && c.type === 'video',
+              )
+              if (!targetClip) return
+              setDetecting(true)
+              try {
+                const detected = await detectBpm(targetClip.file)
+                updateBpmConfig({ bpm: detected })
+              } catch {
+                // silently ignore — user keeps manual value
+              } finally {
+                setDetecting(false)
+              }
+            }}
           >
-            Auto-Detect
+            {detecting ? 'Detecting…' : 'Auto-Detect'}
           </button>
         </div>
       </div>
