@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { PanelLabel } from './TextPanel'
 import type { BpmMode, SegmentLength } from '../../types'
 import { detectBpm } from '../../lib/audio/bpmDetector'
+import { generateCut } from '../../lib/bpm/generateCut'
 
 const MODES: { id: BpmMode; label: string; example: string }[] = [
   { id: 'sequential', label: 'Sequential', example: 'A→B→C→A→B→C' },
@@ -19,7 +20,7 @@ const SEGMENT_LENGTHS: { value: SegmentLength; label: string }[] = [
 ]
 
 export default function BpmPanel() {
-  const { bpmConfig, clips, updateBpmConfig } = useAppStore()
+  const { bpmConfig, clips, updateBpmConfig, replaceSegments } = useAppStore()
   const [detecting, setDetecting] = useState(false)
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -184,7 +185,10 @@ export default function BpmPanel() {
         onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 20px rgba(225,29,72,0.4)' }}
         onMouseDown={(e)  => { e.currentTarget.style.transform = 'scale(0.98)' }}
         onMouseUp={(e)    => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-        onClick={() => alert('Generate Cut — Phase 2')}
+        onClick={() => {
+          const newSegments = generateCut(clips, bpmConfig)
+          if (newSegments.length > 0) replaceSegments(newSegments)
+        }}
       >
         Generate Cut
       </button>
