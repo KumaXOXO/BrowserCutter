@@ -27,8 +27,12 @@ export default function Track({ trackIndex, label, icon, height, zoom, trackLabe
     const clip = clips.find((c) => c.id === clipId)
     if (!clip) return
 
+    // Enforce track type: video/image → V1 (trackIndex 0), audio → Audio (trackIndex 2)
+    if (clip.type === 'video' && trackIndex !== 0) return
+    if (clip.type === 'image' && trackIndex !== 0) return
+    if (clip.type === 'audio' && trackIndex !== 2) return
+
     const rect = e.currentTarget.getBoundingClientRect()
-    // rect is the content div (right of the label) — no label-width offset needed
     const x = e.clientX - rect.left
     const startOnTimeline = Math.max(0, x / (PX_PER_SEC * zoom))
 

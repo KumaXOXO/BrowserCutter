@@ -63,15 +63,7 @@ export default function Timeline() {
           <Track trackIndex={0} label="V1" icon={<Film size={9} />} height={38} zoom={zoom} trackLabelWidth={TRACK_LABEL_WIDTH} />
           <Track trackIndex={1} label="Text" icon={<Type size={9} />} height={26} zoom={zoom} trackLabelWidth={TRACK_LABEL_WIDTH} />
 
-          {/* Audio track (static) */}
-          <div className="flex items-center" style={{ height: 28 }}>
-            <div className="flex items-center gap-1 px-2 shrink-0" style={{ minWidth: TRACK_LABEL_WIDTH, width: TRACK_LABEL_WIDTH, fontSize: 10, color: 'var(--muted-subtle)' }}>
-              <Volume2 size={9} /> Audio
-            </div>
-            <div style={{ position: 'relative', height: 18, width: 700, borderRadius: 4, overflow: 'hidden', margin: '5px 0', background: '#0A1A12' }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(90deg,#1A4A2A 0,#2E7040 3px,#1A4A2A 6px)', opacity: 0.65 }} />
-            </div>
-          </div>
+          <Track trackIndex={2} label="Audio" icon={<Volume2 size={9} />} height={28} zoom={zoom} trackLabelWidth={TRACK_LABEL_WIDTH} />
         </div>
       </div>
     </div>
