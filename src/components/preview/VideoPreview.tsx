@@ -121,6 +121,20 @@ export default function VideoPreview() {
     audio.currentTime = seg.inPoint + (playheadPosition - seg.startOnTimeline)
   }, [playheadPosition]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply volume and playbackRate to video whenever the active segment changes
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !activeSeg) return
+    video.volume = activeSeg.volume ?? 1
+    video.playbackRate = activeSeg.speed ?? 1
+  }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Apply volume to audio element whenever the active audio segment changes
+  useEffect(() => {
+    if (!activeAudioSeg) return
+    audioRef.current.volume = activeAudioSeg.volume ?? 1
+  }, [activeAudioSeg?.id, activeAudioSeg?.volume]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // RAF playback loop
   useEffect(() => {
     const video = videoRef.current
@@ -191,6 +205,8 @@ export default function VideoPreview() {
             objectUrlRef.current = url
             videoRef.current.src = url
             videoRef.current.currentTime = nextSeg.inPoint
+            videoRef.current.volume = nextSeg.volume ?? 1
+            videoRef.current.playbackRate = nextSeg.speed ?? 1
             videoRef.current.play().catch(() => {})
             activeSegRef.current = nextSeg
           } else {
