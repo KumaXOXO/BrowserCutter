@@ -21,8 +21,6 @@ export function useExport(): ExportState {
   const [errorMsg, setErrorMsg] = useState('')
   const workerRef = useRef<Worker | null>(null)
 
-  const { segments, clips, projectSettings } = useAppStore.getState()
-
   const cancel = useCallback(() => {
     workerRef.current?.terminate()
     workerRef.current = null

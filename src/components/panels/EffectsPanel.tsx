@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Sun, Contrast, Droplets, Blend, Circle, ScanLine, Zap } from 'lucide-react'
 import { PanelLabel } from './TextPanel'
 import { useAppStore } from '../../store/useAppStore'
-import { EFFECT_DEFAULTS } from '../../lib/video/effectsFilter'
 import type { EffectType, Effect } from '../../types'
 
 const EFFECT_DEFS: { type: EffectType; label: string; icon: React.ReactNode; min: number; max: number; defaultVal: number }[] = [
