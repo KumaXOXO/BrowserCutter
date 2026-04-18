@@ -6,6 +6,13 @@ import type {
   ActiveTab, MediaSubTab, SelectedElement,
 } from '../types'
 
+interface TimelineSnapshot {
+  segments: Segment[]
+  textOverlays: TextOverlay[]
+}
+
+const MAX_HISTORY = 50
+
 interface AppState {
   // ─── Navigation ───
   activeTab: ActiveTab
@@ -26,6 +33,10 @@ interface AppState {
   textOverlays: TextOverlay[]
   playheadPosition: number  // seconds
   isPlaying: boolean
+
+  // ─── Undo / Redo ───
+  _history: TimelineSnapshot[]
+  _future: TimelineSnapshot[]
 
   // ─── BPM tool ───
   bpmConfig: BpmConfig
@@ -53,9 +64,22 @@ interface AppState {
   updateBpmConfig: (patch: Partial<BpmConfig>) => void
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
+
+  undo: () => void
+  redo: () => void
+  canUndo: () => boolean
+  canRedo: () => boolean
 }
 
-export const useAppStore = create<AppState>((set) => ({
+// Snapshot current timeline state before a mutation
+function push(s: AppState) {
+  return {
+    _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays }],
+    _future: [] as TimelineSnapshot[],
+  }
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   // ─── Navigation ───
   activeTab: 'media',
   mediaSubTab: 'videos',
@@ -83,6 +107,10 @@ export const useAppStore = create<AppState>((set) => ({
   playheadPosition: 0,
   isPlaying: false,
 
+  // ─── Undo / Redo ───
+  _history: [],
+  _future: [],
+
   // ─── BPM tool ───
   bpmConfig: {
     bpm: 128,
@@ -104,21 +132,44 @@ export const useAppStore = create<AppState>((set) => ({
   addClip: (clip) => set((s) => ({ clips: [...s.clips, clip] })),
   removeClip: (id) => set((s) => ({ clips: s.clips.filter((c) => c.id !== id) })),
 
-  addSegment: (segment) => set((s) => ({ segments: [...s.segments, segment] })),
-  removeSegment: (id) => set((s) => ({ segments: s.segments.filter((seg) => seg.id !== id) })),
+  addSegment: (segment) => set((s) => ({ ...push(s), segments: [...s.segments, segment] })),
+  removeSegment: (id) => set((s) => ({ ...push(s), segments: s.segments.filter((seg) => seg.id !== id) })),
   updateSegment: (id, patch) =>
-    set((s) => ({ segments: s.segments.map((seg) => seg.id === id ? { ...seg, ...patch } : seg) })),
-  addSegments: (newSegs) => set((s) => ({ segments: [...s.segments, ...newSegs] })),
+    set((s) => ({ ...push(s), segments: s.segments.map((seg) => seg.id === id ? { ...seg, ...patch } : seg) })),
+  addSegments: (newSegs) => set((s) => ({ ...push(s), segments: [...s.segments, ...newSegs] })),
   replaceSegments: (newSegs) =>
-    set((s) => ({ segments: [...s.segments.filter((seg) => seg.trackIndex !== 0), ...newSegs] })),
+    set((s) => ({ ...push(s), segments: [...s.segments.filter((seg) => seg.trackIndex !== 0), ...newSegs] })),
 
-  addTextOverlay: (overlay) => set((s) => ({ textOverlays: [...s.textOverlays, overlay] })),
+  addTextOverlay: (overlay) => set((s) => ({ ...push(s), textOverlays: [...s.textOverlays, overlay] })),
   updateTextOverlay: (id, patch) =>
-    set((s) => ({ textOverlays: s.textOverlays.map((o) => o.id === id ? { ...o, ...patch } : o) })),
-  removeTextOverlay: (id) => set((s) => ({ textOverlays: s.textOverlays.filter((o) => o.id !== id) })),
+    set((s) => ({ ...push(s), textOverlays: s.textOverlays.map((o) => o.id === id ? { ...o, ...patch } : o) })),
+  removeTextOverlay: (id) => set((s) => ({ ...push(s), textOverlays: s.textOverlays.filter((o) => o.id !== id) })),
 
   updateBpmConfig: (patch) =>
     set((s) => ({ bpmConfig: { ...s.bpmConfig, ...patch } })),
   setPlayheadPosition: (pos) => set({ playheadPosition: pos }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
+
+  undo: () => set((s) => {
+    if (s._history.length === 0) return s
+    const prev = s._history[s._history.length - 1]
+    return {
+      ...prev,
+      _history: s._history.slice(0, -1),
+      _future: [{ segments: s.segments, textOverlays: s.textOverlays }, ...s._future.slice(0, MAX_HISTORY - 1)],
+    }
+  }),
+
+  redo: () => set((s) => {
+    if (s._future.length === 0) return s
+    const next = s._future[0]
+    return {
+      ...next,
+      _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays }],
+      _future: s._future.slice(1),
+    }
+  }),
+
+  canUndo: () => get()._history.length > 0,
+  canRedo: () => get()._future.length > 0,
 }))

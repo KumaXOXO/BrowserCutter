@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { formatTime } from '../../lib/utils'
 
 export default function PlaybackControls() {
-  const { isPlaying, playheadPosition, segments, setIsPlaying, setPlayheadPosition } = useAppStore()
+  const { isPlaying, playheadPosition, segments, setIsPlaying, setPlayheadPosition, undo, redo, canUndo, canRedo } = useAppStore()
 
   const totalDuration = segments
     .filter((s) => s.trackIndex === 0)
@@ -12,15 +12,8 @@ export default function PlaybackControls() {
 
   const progress = totalDuration > 0 ? (playheadPosition / totalDuration) * 100 : 0
 
-  const handleSkipBack = () => {
-    setIsPlaying(false)
-    setPlayheadPosition(0)
-  }
-
-  const handleSkipForward = () => {
-    setIsPlaying(false)
-    setPlayheadPosition(totalDuration)
-  }
+  const handleUndo = () => { setIsPlaying(false); undo() }
+  const handleRedo = () => { setIsPlaying(false); redo() }
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsPlaying(false)
@@ -34,9 +27,9 @@ export default function PlaybackControls() {
       className="flex items-center gap-2.5 px-4 shrink-0"
       style={{ height: 46, background: 'var(--surface)', borderTop: '1px solid var(--border-subtle)' }}
     >
-      <IconBtn onClick={handleSkipBack}><SkipBack size={14} fill="currentColor" /></IconBtn>
+      <IconBtn onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!canUndo()}><SkipBack size={14} fill="currentColor" /></IconBtn>
       <PlayBtn isPlaying={isPlaying} onToggle={() => setIsPlaying(!isPlaying)} />
-      <IconBtn onClick={handleSkipForward}><SkipForward size={14} fill="currentColor" /></IconBtn>
+      <IconBtn onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!canRedo()}><SkipForward size={14} fill="currentColor" /></IconBtn>
       <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted-subtle)' }}>{formatTime(playheadPosition)}</span>
       <SeekBar progress={progress} onSeek={handleSeek} />
       <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted-subtle)' }}>{formatTime(totalDuration)}</span>
@@ -45,13 +38,15 @@ export default function PlaybackControls() {
   )
 }
 
-function IconBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+function IconBtn({ children, onClick, title, disabled }: { children: React.ReactNode; onClick?: () => void; title?: string; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center rounded-md cursor-pointer transition-all duration-150"
-      style={{ width: 28, height: 28, background: 'transparent', border: 'none', color: 'var(--muted-subtle)' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--text)' }}
+      title={title}
+      disabled={disabled}
+      className="flex items-center justify-center rounded-md transition-all duration-150"
+      style={{ width: 28, height: 28, background: 'transparent', border: 'none', color: 'var(--muted-subtle)', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.3 : 1 }}
+      onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--text)' } }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted-subtle)' }}
     >
       {children}

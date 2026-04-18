@@ -12,7 +12,7 @@ function saveProject() {
 }
 
 export default function TopBar() {
-  const { projectName, setProjectName } = useAppStore()
+  const { projectName, setProjectName, undo, redo, canUndo, canRedo } = useAppStore()
   const [saved, setSaved] = useState(false)
 
   function handleSave() {
@@ -23,7 +23,11 @@ export default function TopBar() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSave() }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 's') { e.preventDefault(); handleSave() }
+        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+        if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -58,8 +62,8 @@ export default function TopBar() {
 
       {/* Right: actions */}
       <div className="flex items-center gap-1.5">
-        <IconBtn title="Undo"><Undo2 size={14} /></IconBtn>
-        <IconBtn title="Redo"><Redo2 size={14} /></IconBtn>
+        <IconBtn title="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo()}><Undo2 size={14} /></IconBtn>
+        <IconBtn title="Redo (Ctrl+Y)" onClick={redo} disabled={!canRedo()}><Redo2 size={14} /></IconBtn>
         <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
         <GhostBtn onClick={handleSave}>
           <Save size={13} />
@@ -88,13 +92,15 @@ function Logo() {
   )
 }
 
-function IconBtn({ children, title }: { children: React.ReactNode; title: string }) {
+function IconBtn({ children, title, onClick, disabled }: { children: React.ReactNode; title: string; onClick?: () => void; disabled?: boolean }) {
   return (
     <button
       title={title}
-      className="flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer"
-      style={{ width: 28, height: 28, color: 'var(--muted2)', background: 'transparent', border: 'none' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--text)' }}
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center justify-center rounded-md transition-all duration-150"
+      style={{ width: 28, height: 28, color: 'var(--muted2)', background: 'transparent', border: 'none', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.3 : 1 }}
+      onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--text)' } }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted2)' }}
     >
       {children}
