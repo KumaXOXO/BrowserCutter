@@ -3,6 +3,7 @@ import { useRef, useEffect, useMemo } from 'react'
 import { Film } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatTime } from '../../lib/utils'
+import TextOverlayRenderer from './TextOverlayRenderer'
 import type { Segment } from '../../types'
 
 export default function VideoPreview() {
@@ -255,6 +256,7 @@ export default function VideoPreview() {
           ref={videoRef}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
         />
+        <TextOverlayRenderer />
         {!hasSegments && (
           <div
             className="absolute inset-0 flex items-center justify-center"
