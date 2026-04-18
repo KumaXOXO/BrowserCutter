@@ -1,12 +1,47 @@
 // src/components/panels/TextPanel.tsx
 import { Type, FileText } from 'lucide-react'
+import { v4 as uuidv4 } from 'uuid'
+import { useAppStore } from '../../store/useAppStore'
+import { parseSrt } from '../../lib/srt/parseSrt'
 
 export default function TextPanel() {
+  const { addTextOverlay, setSelectedElement, playheadPosition } = useAppStore()
+
+  function handleAddText() {
+    const id = uuidv4()
+    addTextOverlay({
+      id,
+      text: 'New Text',
+      startOnTimeline: playheadPosition,
+      duration: 3,
+      font: 'Inter',
+      size: 32,
+      color: '#FFFFFF',
+      x: 0.5,
+      y: 0.85,
+    })
+    setSelectedElement({ type: 'text', id })
+  }
+
+  async function handleImportSrt() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.srt'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const text = await file.text()
+      const overlays = parseSrt(text)
+      overlays.forEach(addTextOverlay)
+    }
+    input.click()
+  }
+
   return (
     <div className="flex flex-col gap-3 p-3.5 overflow-y-auto h-full">
       <PanelLabel>Text &amp; Subtitles</PanelLabel>
-      <GhostAction icon={<Type size={13} />} label="Add Text Overlay" onClick={() => alert('Phase 2')} />
-      <GhostAction icon={<FileText size={13} />} label="Import .srt File" onClick={() => alert('Phase 2')} />
+      <GhostAction icon={<Type size={13} />} label="Add Text Overlay" onClick={handleAddText} />
+      <GhostAction icon={<FileText size={13} />} label="Import .srt File" onClick={handleImportSrt} />
       <p className="text-xs" style={{ color: 'var(--muted-subtle)' }}>No text or subtitles added yet.</p>
     </div>
   )
