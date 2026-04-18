@@ -1,9 +1,33 @@
 // src/components/layout/TopBar.tsx
+import { useState, useEffect } from 'react'
 import { Undo2, Redo2, Save } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 
+const SAVE_KEY = 'browsercutter_project'
+
+function saveProject() {
+  const { projectName, projectSettings, segments, textOverlays, bpmConfig } = useAppStore.getState()
+  const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, savedAt: Date.now() }
+  localStorage.setItem(SAVE_KEY, JSON.stringify(data))
+}
+
 export default function TopBar() {
   const { projectName, setProjectName } = useAppStore()
+  const [saved, setSaved] = useState(false)
+
+  function handleSave() {
+    saveProject()
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1800)
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSave() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -37,11 +61,11 @@ export default function TopBar() {
         <IconBtn title="Undo"><Undo2 size={14} /></IconBtn>
         <IconBtn title="Redo"><Redo2 size={14} /></IconBtn>
         <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
-        <GhostBtn>
+        <GhostBtn onClick={handleSave}>
           <Save size={13} />
-          Save
+          {saved ? 'Saved!' : 'Save'}
         </GhostBtn>
-        <PrimaryBtn onClick={() => alert('Export not yet implemented')}>
+        <PrimaryBtn onClick={() => alert('Export is coming in Phase 7.\nYou can save your project with Ctrl+S and reload it later.')}>
           Export Video
         </PrimaryBtn>
       </div>

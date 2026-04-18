@@ -12,7 +12,9 @@ export default function MusicList({ clips }: { clips: Clip[] }) {
       {clips.map((clip) => (
         <div
           key={clip.id}
-          className="flex items-center gap-2.5 rounded-lg cursor-pointer transition-all duration-150"
+          draggable
+          onDragStart={(e) => e.dataTransfer.setData('clipId', clip.id)}
+          className="flex items-center gap-2.5 rounded-lg cursor-grab transition-all duration-150"
           style={{ padding: '8px 10px', border: '1px solid transparent' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.borderColor = 'var(--border-subtle)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}

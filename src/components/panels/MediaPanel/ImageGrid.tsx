@@ -11,7 +11,9 @@ export default function ImageGrid({ clips }: { clips: Clip[] }) {
       {clips.map((clip) => (
         <div
           key={clip.id}
-          className="rounded-lg overflow-hidden cursor-pointer transition-all duration-200"
+          draggable
+          onDragStart={(e) => e.dataTransfer.setData('clipId', clip.id)}
+          className="rounded-lg overflow-hidden cursor-grab transition-all duration-200"
           style={{ border: '1px solid var(--border-subtle)', aspectRatio: '1' }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)' }}

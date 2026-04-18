@@ -147,10 +147,42 @@ export default function VideoPreview() {
       return
     }
 
-    if (!video || !activeSeg) {
+    if (!video) {
       setIsPlaying(false)
       return
     }
+
+    // If no segment at the current playhead, seek to the first available segment
+    let startSeg = activeSeg
+    if (!startSeg) {
+      const firstSeg = [...segmentsRef.current]
+        .filter((s) => s.trackIndex === 0)
+        .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
+
+      if (!firstSeg) {
+        setIsPlaying(false)
+        return
+      }
+
+      const clip = clipsRef.current.find((c) => c.id === firstSeg.clipId)
+      if (!clip?.file) {
+        setIsPlaying(false)
+        return
+      }
+
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+      const url = URL.createObjectURL(clip.file)
+      objectUrlRef.current = url
+      video.src = url
+      video.currentTime = firstSeg.inPoint
+      video.volume = firstSeg.volume ?? 1
+      video.playbackRate = firstSeg.speed ?? 1
+      activeSegRef.current = firstSeg
+      setPlayheadPosition(firstSeg.startOnTimeline)
+      startSeg = firstSeg
+    }
+
+    void startSeg // used to satisfy linter — activeSegRef was updated above
 
     video.play().catch(() => setIsPlaying(false))
 

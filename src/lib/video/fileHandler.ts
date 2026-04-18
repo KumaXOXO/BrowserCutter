@@ -29,9 +29,13 @@ export async function openVideoFiles(): Promise<File[]> {
   })
 }
 
+const VIDEO_EXTS = new Set(['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'ogv'])
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'aac', 'ogg', 'm4a', 'flac', 'opus'])
+
 export async function fileToClip(file: File): Promise<Clip> {
-  const type = file.type.startsWith('video/') ? 'video'
-    : file.type.startsWith('audio/') ? 'audio'
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  const type = file.type.startsWith('video/') || VIDEO_EXTS.has(ext) ? 'video'
+    : file.type.startsWith('audio/') || AUDIO_EXTS.has(ext) ? 'audio'
     : 'image'
 
   const id = uuidv4()
