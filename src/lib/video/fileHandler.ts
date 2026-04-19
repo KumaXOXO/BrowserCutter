@@ -4,21 +4,8 @@ import type { Clip } from '../../types'
 import { generateThumbnail } from './thumbnail'
 
 export async function openVideoFiles(): Promise<File[]> {
-  // File System Access API (Chrome 86+)
-  if ('showOpenFilePicker' in window) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handles = await (window as any).showOpenFilePicker({
-      multiple: true,
-      types: [
-        { description: 'Video files', accept: { 'video/*': ['.mp4', '.mov', '.avi', '.webm', '.mkv'] } },
-        { description: 'Audio files', accept: { 'audio/*': ['.mp3', '.wav', '.aac', '.ogg'] } },
-        { description: 'Image files', accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'] } },
-      ],
-    })
-    return Promise.all(handles.map((h: FileSystemFileHandle) => h.getFile()))
-  }
-
-  // Fallback: standard file input
+  // Use standard file input — FSAPI (showOpenFilePicker) files lose read
+  // permission after focus changes, causing NotReadableError at export time.
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
