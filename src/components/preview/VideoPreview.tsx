@@ -92,13 +92,14 @@ export default function VideoPreview() {
     audio.currentTime = seg.inPoint + (playheadPosition - seg.startOnTimeline)
   }, [playheadPosition]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply volume and playbackRate to video when active segment changes
+  // Apply volume, playbackRate, and muted to video when active segment changes
   useEffect(() => {
     const video = videoRef.current
     if (!video || !activeSeg) return
     video.volume = activeSeg.volume ?? 1
     video.playbackRate = activeSeg.speed ?? 1
-  }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed]) // eslint-disable-line react-hooks/exhaustive-deps
+    video.muted = activeSeg.muted ?? false
+  }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed, activeSeg?.muted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply volume to audio element when active audio segment changes
   useEffect(() => {
@@ -164,8 +165,12 @@ export default function VideoPreview() {
         audioOnlyCleanup = startAudioOnlyTick({
           audioRef,
           rafRef,
-          startOnTimeline: firstAudioSeg.startOnTimeline,
-          inPoint: firstAudioSeg.inPoint,
+          cancelPlayRef,
+          playAbortRef,
+          segmentsRef,
+          clipsRef,
+          audioUrlRef,
+          initialSeg: firstAudioSeg,
           setPlayheadPosition,
           setIsPlaying,
         })
@@ -180,6 +185,7 @@ export default function VideoPreview() {
         video.currentTime = firstVideoSeg.inPoint
         video.volume = firstVideoSeg.volume ?? 1
         video.playbackRate = firstVideoSeg.speed ?? 1
+        video.muted = firstVideoSeg.muted ?? false
         activeSegRef.current = firstVideoSeg
         setPlayheadPosition(firstVideoSeg.startOnTimeline)
         startSeg = firstVideoSeg

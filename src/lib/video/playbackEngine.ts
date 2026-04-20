@@ -130,6 +130,7 @@ export function startVideoTick(params: VideoTickParams): void {
           videoRef.current.currentTime = nextSeg.inPoint
           videoRef.current.volume = nextSeg.volume ?? 1
           videoRef.current.playbackRate = nextSeg.speed ?? 1
+          videoRef.current.muted = nextSeg.muted ?? false
           playAbortRef.current = { cancelled: false }
           cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
           activeSegRef.current = nextSeg
@@ -153,30 +154,68 @@ export function startVideoTick(params: VideoTickParams): void {
 export interface AudioOnlyTickParams {
   audioRef: { current: HTMLAudioElement }
   rafRef: { current: number }
-  startOnTimeline: number
-  inPoint: number
+  cancelPlayRef: { current: () => void }
+  playAbortRef: { current: { cancelled: boolean } }
+  segmentsRef: { current: Segment[] }
+  clipsRef: { current: Clip[] }
+  audioUrlRef: { current: string | null }
+  initialSeg: Segment
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
 }
 
 // startAudioOnlyTick — RAF loop for audio-only timelines.
+// Supports multi-segment playback: transitions to the next audio segment at boundary.
 // Mutually exclusive with startVideoTick — never run both simultaneously.
-// Returns a cleanup function that removes the ended listener.
+// Returns a cleanup function.
 export function startAudioOnlyTick(params: AudioOnlyTickParams): () => void {
-  const { audioRef, rafRef, startOnTimeline, inPoint, setPlayheadPosition, setIsPlaying } = params
+  const {
+    audioRef, rafRef, cancelPlayRef, playAbortRef,
+    segmentsRef, clipsRef, audioUrlRef, initialSeg,
+    setPlayheadPosition, setIsPlaying,
+  } = params
 
-  const onEnded = () => setIsPlaying(false)
-  audioRef.current.addEventListener('ended', onEnded, { once: true })
+  const currentSegRef = { current: initialSeg }
 
   const tick = () => {
-    if (!audioRef.current || audioRef.current.paused) return
-    const elapsed = audioRef.current.currentTime - inPoint
-    setPlayheadPosition(startOnTimeline + elapsed)
+    const seg = currentSegRef.current
+    if (!seg || audioRef.current.paused) return
+
+    const rawTime = audioRef.current.currentTime
+    setPlayheadPosition(seg.startOnTimeline + (rawTime - seg.inPoint))
+
+    if (rawTime >= seg.outPoint - 0.05) {
+      const nextSeg = segmentsRef.current
+        .filter((s) => s.trackIndex === 2 && !s.muted && s.startOnTimeline > seg.startOnTimeline)
+        .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0]
+
+      if (nextSeg) {
+        const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
+        if (nextClip?.file) {
+          cancelPlayRef.current()
+          if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
+          const url = URL.createObjectURL(nextClip.file)
+          audioUrlRef.current = url
+          audioRef.current.src = url
+          audioRef.current.currentTime = nextSeg.inPoint
+          audioRef.current.volume = nextSeg.volume ?? 1
+          playAbortRef.current = { cancelled: false }
+          cancelPlayRef.current = playWhenReady(audioRef.current, () => setIsPlaying(false), playAbortRef.current)
+          currentSegRef.current = nextSeg
+        } else {
+          setIsPlaying(false)
+          return
+        }
+      } else {
+        setIsPlaying(false)
+        return
+      }
+    }
+
     rafRef.current = requestAnimationFrame(tick)
   }
+
   rafRef.current = requestAnimationFrame(tick)
 
-  return () => {
-    audioRef.current?.removeEventListener('ended', onEnded)
-  }
+  return () => {}
 }
