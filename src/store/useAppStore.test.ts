@@ -112,6 +112,67 @@ describe('textOverlay store actions', () => {
   })
 })
 
+describe('loadProject', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      projectName: 'Old Name',
+      segments: [],
+      clips: [],
+      textOverlays: [],
+      transitions: [],
+      adjustmentLayers: [],
+      isPlaying: true,
+      playheadPosition: 5,
+      _history: [{ segments: [], textOverlays: [] }],
+      _future: [{ segments: [], textOverlays: [] }],
+    })
+  })
+
+  const minimalData = {
+    segments: [],
+    clips: [],
+    projectSettings: { resolution: '1920x1080', fps: 30, format: 'mp4', quality: 'good', autoDetectBpm: true, snapToBeat: true, hardwareAcceleration: false, showClipThumbnails: false },
+    transitions: [],
+    adjustmentLayers: [],
+    textOverlays: [],
+  }
+
+  it('sets clips with file=null', () => {
+    const data = { ...minimalData, clips: [{ id: 'c1', name: 'test.mp4', duration: 5, width: 1920, height: 1080, type: 'video' }] }
+    useAppStore.getState().loadProject(data as Record<string, unknown>)
+    const { clips } = useAppStore.getState()
+    expect(clips).toHaveLength(1)
+    expect(clips[0].id).toBe('c1')
+    expect(clips[0].file).toBeNull()
+  })
+
+  it('resets isPlaying to false', () => {
+    useAppStore.getState().loadProject(minimalData as Record<string, unknown>)
+    expect(useAppStore.getState().isPlaying).toBe(false)
+  })
+
+  it('resets playheadPosition to 0', () => {
+    useAppStore.getState().loadProject(minimalData as Record<string, unknown>)
+    expect(useAppStore.getState().playheadPosition).toBe(0)
+  })
+
+  it('clears undo history', () => {
+    useAppStore.getState().loadProject(minimalData as Record<string, unknown>)
+    expect(useAppStore.getState()._history).toHaveLength(0)
+    expect(useAppStore.getState()._future).toHaveLength(0)
+  })
+
+  it('restores projectName from data', () => {
+    useAppStore.getState().loadProject({ ...minimalData, projectName: 'New Name' } as Record<string, unknown>)
+    expect(useAppStore.getState().projectName).toBe('New Name')
+  })
+
+  it('falls back to existing projectName when missing in data', () => {
+    useAppStore.getState().loadProject(minimalData as Record<string, unknown>)
+    expect(useAppStore.getState().projectName).toBe('Old Name')
+  })
+})
+
 describe('masterVolume', () => {
   beforeEach(() => {
     useAppStore.setState({ masterVolume: 1 })
