@@ -69,6 +69,7 @@ export interface VideoTickParams {
   rafRef: { current: number }
   cancelPlayRef: { current: () => void }
   playAbortRef: { current: { cancelled: boolean } }
+  masterVolumeRef: { current: number }
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
 }
@@ -79,7 +80,7 @@ export function startVideoTick(params: VideoTickParams): void {
   const {
     videoRef, audioRef, segmentsRef, clipsRef, activeSegRef,
     objectUrlRef, stallCountRef, rafRef, cancelPlayRef, playAbortRef,
-    setPlayheadPosition, setIsPlaying,
+    masterVolumeRef, setPlayheadPosition, setIsPlaying,
   } = params
 
   const tick = () => {
@@ -128,7 +129,7 @@ export function startVideoTick(params: VideoTickParams): void {
           objectUrlRef.current = url
           videoRef.current.src = url
           videoRef.current.currentTime = nextSeg.inPoint
-          videoRef.current.volume = nextSeg.volume ?? 1
+          videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
           videoRef.current.playbackRate = nextSeg.speed ?? 1
           videoRef.current.muted = nextSeg.muted ?? false
           playAbortRef.current = { cancelled: false }
@@ -159,6 +160,7 @@ export interface AudioOnlyTickParams {
   segmentsRef: { current: Segment[] }
   clipsRef: { current: Clip[] }
   audioUrlRef: { current: string | null }
+  masterVolumeRef: { current: number }
   initialSeg: Segment
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
@@ -171,7 +173,7 @@ export interface AudioOnlyTickParams {
 export function startAudioOnlyTick(params: AudioOnlyTickParams): () => void {
   const {
     audioRef, rafRef, cancelPlayRef, playAbortRef,
-    segmentsRef, clipsRef, audioUrlRef, initialSeg,
+    segmentsRef, clipsRef, audioUrlRef, masterVolumeRef, initialSeg,
     setPlayheadPosition, setIsPlaying,
   } = params
 
@@ -198,7 +200,7 @@ export function startAudioOnlyTick(params: AudioOnlyTickParams): () => void {
           audioUrlRef.current = url
           audioRef.current.src = url
           audioRef.current.currentTime = nextSeg.inPoint
-          audioRef.current.volume = nextSeg.volume ?? 1
+          audioRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
           playAbortRef.current = { cancelled: false }
           cancelPlayRef.current = playWhenReady(audioRef.current, () => setIsPlaying(false), playAbortRef.current)
           currentSegRef.current = nextSeg

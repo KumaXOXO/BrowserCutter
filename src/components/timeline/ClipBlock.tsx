@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Eye, EyeOff, Volume2, VolumeX } from 'lucide-react'
 import type { Segment, Clip } from '../../types'
 import { useAppStore } from '../../store/useAppStore'
+import ThumbnailLayer from './ThumbnailLayer'
+import WaveformCanvas from './WaveformCanvas'
 
 const CLIP_GRADIENTS = [
   'linear-gradient(135deg,#5B21B6,#7C3AED)',
@@ -21,11 +23,12 @@ interface Props {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, removeSegment, updateSegment } = useAppStore()
+  const { selectedElement, setSelectedElement, removeSegment, updateSegment, projectSettings } = useAppStore()
+  const showThumbnails = projectSettings.showClipThumbnails ?? false
   const isSelected = selectedElement?.id === segment.id
   const px = PX_PER_SEC * zoom
   const left  = segment.startOnTimeline * px
-  const width = (segment.outPoint - segment.inPoint) * px
+  const width = (segment.outPoint - segment.inPoint) / Math.max(0.01, segment.speed ?? 1) * px
   const showButtons = width >= 60
 
   const [hovered, setHovered] = useState(false)
@@ -143,6 +146,14 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         transition: 'filter 120ms, opacity 120ms',
       }}
     >
+      {/* Thumbnail layer — z-index 0, only for non-audio when enabled */}
+      {showThumbnails && clip.type !== 'audio' && (
+        <ThumbnailLayer clipId={clip.id} file={clip.file ?? null} inPoint={segment.inPoint} />
+      )}
+
+      {/* Waveform canvas — z-index 2, all clip types */}
+      <WaveformCanvas clipId={clip.id} file={clip.file ?? null} />
+
       {/* Left trim handle */}
       <div
         onMouseDown={handleLeftTrimMouseDown}

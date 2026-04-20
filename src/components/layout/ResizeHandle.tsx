@@ -1,18 +1,20 @@
 // src/components/layout/ResizeHandle.tsx
-// Shared vertical resize handle. Horizontal resize (left panel) will reuse this in Phase 10.
 
 interface Props {
   onDragStart: () => void
-  onResize: (dy: number) => void
+  onResize: (delta: number) => void
   onDragEnd: () => void
+  axis?: 'vertical' | 'horizontal'
 }
 
-export default function ResizeHandle({ onDragStart, onResize, onDragEnd }: Props) {
+export default function ResizeHandle({ onDragStart, onResize, onDragEnd, axis = 'vertical' }: Props) {
+  const isHorizontal = axis === 'horizontal'
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     onDragStart()
-    const startY = e.clientY
-    const onMove = (ev: MouseEvent) => onResize(ev.clientY - startY)
+    const startPos = isHorizontal ? e.clientX : e.clientY
+    const onMove = (ev: MouseEvent) => onResize((isHorizontal ? ev.clientX : ev.clientY) - startPos)
     const onUp = () => {
       onDragEnd()
       document.removeEventListener('mousemove', onMove)
@@ -26,8 +28,9 @@ export default function ResizeHandle({ onDragStart, onResize, onDragEnd }: Props
     <div
       onMouseDown={handleMouseDown}
       style={{
-        height: 4,
-        cursor: 'ns-resize',
+        ...(isHorizontal
+          ? { width: 4, cursor: 'col-resize', height: '100%' }
+          : { height: 4, cursor: 'ns-resize', width: '100%' }),
         background: 'var(--border-subtle)',
         flexShrink: 0,
         transition: 'background 150ms',

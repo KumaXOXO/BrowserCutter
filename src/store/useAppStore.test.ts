@@ -111,3 +111,23 @@ describe('textOverlay store actions', () => {
     expect(useAppStore.getState().textOverlays).toHaveLength(1)
   })
 })
+
+describe('masterVolume', () => {
+  beforeEach(() => {
+    useAppStore.setState({ masterVolume: 1 })
+  })
+
+  it('defaults to 1', () => {
+    expect(useAppStore.getState().masterVolume).toBe(1)
+  })
+
+  it('setMasterVolume updates the value', () => {
+    useAppStore.getState().setMasterVolume(0.5)
+    expect(useAppStore.getState().masterVolume).toBe(0.5)
+  })
+
+  it('setMasterVolume accepts 0', () => {
+    useAppStore.getState().setMasterVolume(0)
+    expect(useAppStore.getState().masterVolume).toBe(0)
+  })
+})

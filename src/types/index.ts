@@ -89,6 +89,7 @@ export interface ProjectSettings {
   autoDetectBpm: boolean
   snapToBeat: boolean
   hardwareAcceleration: boolean
+  showClipThumbnails: boolean
 }
 
 export type SelectedElementType = 'segment' | 'adjustment' | 'text' | 'transition' | null

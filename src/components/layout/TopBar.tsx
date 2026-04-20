@@ -1,21 +1,34 @@
 // src/components/layout/TopBar.tsx
-import { useState, useEffect } from 'react'
-import { Undo2, Redo2, Save } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Undo2, Redo2, Save, FolderOpen } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import ExportModal from '../export/ExportModal'
 
 const SAVE_KEY = 'browsercutter_project'
 
 function saveProject() {
-  const { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers } = useAppStore.getState()
-  const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, savedAt: Date.now() }
+  const { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips } = useAppStore.getState()
+  const serializedClips = clips.map(({ file: _f, ...meta }) => meta)
+  const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips: serializedClips, savedAt: Date.now() }
   localStorage.setItem(SAVE_KEY, JSON.stringify(data))
 }
 
+export function validateProjectJSON(json: unknown): { valid: true; data: Record<string, unknown> } | { valid: false; error: string } {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    return { valid: false, error: 'Invalid JSON structure' }
+  }
+  const obj = json as Record<string, unknown>
+  if (!Array.isArray(obj.segments)) return { valid: false, error: 'Missing segments' }
+  if (!Array.isArray(obj.clips)) return { valid: false, error: 'Missing clips' }
+  if (typeof obj.projectSettings !== 'object' || obj.projectSettings === null) return { valid: false, error: 'Missing projectSettings' }
+  return { valid: true, data: obj }
+}
+
 export default function TopBar() {
-  const { projectName, setProjectName, undo, redo, canUndo, canRedo } = useAppStore()
+  const { projectName, setProjectName, undo, redo, canUndo, canRedo, loadProject } = useAppStore()
   const [saved, setSaved] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleSave() {
     saveProject()
@@ -23,8 +36,41 @@ export default function TopBar() {
     setTimeout(() => setSaved(false), 1800)
   }
 
+  function handleLoadClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target?.result as string)
+        const result = validateProjectJSON(json)
+        if (!result.valid) {
+          alert(`Load failed: ${result.error}`)
+          return
+        }
+        loadProject(result.data)
+      } catch {
+        alert('Load failed: invalid JSON file')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.ctrlKey && !e.metaKey) {
+        const el = document.activeElement
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement)?.isContentEditable) return
+        e.preventDefault()
+        const { isPlaying, setIsPlaying } = useAppStore.getState()
+        setIsPlaying(!isPlaying)
+        return
+      }
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 's') { e.preventDefault(); handleSave() }
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
@@ -67,6 +113,10 @@ export default function TopBar() {
         <IconBtn title="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo()}><Undo2 size={14} /></IconBtn>
         <IconBtn title="Redo (Ctrl+Y)" onClick={redo} disabled={!canRedo()}><Redo2 size={14} /></IconBtn>
         <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
+        <GhostBtn onClick={handleLoadClick}>
+          <FolderOpen size={13} />
+          Load
+        </GhostBtn>
         <GhostBtn onClick={handleSave}>
           <Save size={13} />
           {saved ? 'Saved!' : 'Save'}
@@ -75,6 +125,13 @@ export default function TopBar() {
           Export Video
         </PrimaryBtn>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
