@@ -13,9 +13,4 @@
 ---
 
 ### Safari OffscreenCanvas fallback for thumbnail extraction
-**What:** Feature-detect `OffscreenCanvas` in `thumbnails.ts` and fall back to `createElement('canvas')` (main thread) when unavailable.  
-**Why:** `OffscreenCanvas` is unavailable on Safari < 16.4 and all iOS WebViews before that version. Phase 10 thumbnails silently fail on those browsers with no error surfaced.  
-**Pros:** ~15 LOC guard; fixes silent failure for a still-common browser version on mobile.  
-**Cons:** Main-thread canvas fallback blocks the render thread during `drawImage`. Fine for one-at-a-time use; the concurrency queue (max 5) prevents pile-up.  
-**Context:** `src/lib/video/thumbnails.ts` — the extraction step is `ctx.drawImage(video, 0, 0, ...)`. Guard: `if (typeof OffscreenCanvas !== 'undefined') { use OffscreenCanvas } else { use document.createElement('canvas') }`. Worker path is not affected.  
-**Depends on:** Phase 10 thumbnails.ts implementation.
+**Status: DONE** (implemented in Phase 10, `thumbnails.ts:69-71`)
