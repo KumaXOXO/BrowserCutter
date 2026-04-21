@@ -20,7 +20,8 @@
 //                              │ no next seg                         │
 //                              └─────────────── setIsPlaying(false) ─┘
 
-import type { Segment, Clip } from '../../types'
+import type { Segment, Clip, Transition, TransitionType } from '../../types'
+import { applyTransitionStyles } from './transitionStyles'
 
 // playWhenReady — calls media.play() once the element is buffered enough.
 // Returns a cancel function that cleans up any pending event listeners.
@@ -70,9 +71,16 @@ export interface VideoTickParams {
   cancelPlayRef: { current: () => void }
   playAbortRef: { current: { cancelled: boolean } }
   masterVolumeRef: { current: number }
+  // Transition overlay — second video element for dissolve/wipe/slide/zoom
+  transitionVideoRef: { current: HTMLVideoElement | null }
+  transitionUrlRef: { current: string | null }
+  transitionsRef: { current: Transition[] }
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
 }
+
+// TRANSITION_TYPES that use the second video element (fade is handled by CSS overlay in VideoPreview)
+const OVERLAY_TRANSITIONS: TransitionType[] = ['dissolve', 'wipe', 'slide', 'zoom']
 
 // startVideoTick — starts the RAF loop that drives video playback.
 // Mutually exclusive with startAudioOnlyTick — never run both simultaneously.
@@ -80,7 +88,8 @@ export function startVideoTick(params: VideoTickParams): void {
   const {
     videoRef, audioRef, segmentsRef, clipsRef, activeSegRef,
     objectUrlRef, stallCountRef, rafRef, cancelPlayRef, playAbortRef,
-    masterVolumeRef, setPlayheadPosition, setIsPlaying,
+    masterVolumeRef, transitionVideoRef, transitionUrlRef, transitionsRef,
+    setPlayheadPosition, setIsPlaying,
   } = params
 
   const tick = () => {
@@ -115,20 +124,61 @@ export function startVideoTick(params: VideoTickParams): void {
       audioRef.current.pause()
     }
 
-    if (rawTime >= seg.outPoint - 0.05) {
-      const nextSeg = segmentsRef.current
-        .filter((s) => s.trackIndex === 0 && !s.hidden && s.startOnTimeline > seg.startOnTimeline)
-        .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0]
+    // Resolve next video segment (shared by both transition preload and segment swap)
+    const nextSeg = segmentsRef.current
+      .filter((s) => s.trackIndex === 0 && !s.hidden && s.startOnTimeline > seg.startOnTimeline)
+      .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0]
 
+    // Transition preload: for dissolve/wipe/slide/zoom, load B early and animate
+    if (nextSeg && transitionVideoRef.current) {
+      const trans = transitionsRef.current.find(
+        (t) => t.beforeSegmentId === seg.id && t.afterSegmentId === nextSeg.id &&
+          OVERLAY_TRANSITIONS.includes(t.type) && t.duration > 0,
+      )
+      if (trans) {
+        const segDuration = (seg.outPoint - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
+        const transStart = seg.startOnTimeline + segDuration - trans.duration
+        if (currentPlayhead >= transStart) {
+          // Lazy-load B on first entry into transition window
+          if (!transitionUrlRef.current) {
+            const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
+            if (nextClip?.file) {
+              const tUrl = URL.createObjectURL(nextClip.file)
+              transitionUrlRef.current = tUrl
+              transitionVideoRef.current.src = tUrl
+              transitionVideoRef.current.currentTime = nextSeg.inPoint
+              transitionVideoRef.current.volume = 0  // muted while B plays under A
+              transitionVideoRef.current.playbackRate = nextSeg.speed ?? 1
+              transitionVideoRef.current.play().catch(() => {})
+            }
+          }
+          if (transitionUrlRef.current && videoRef.current) {
+            const progress = Math.min(1, (currentPlayhead - transStart) / trans.duration)
+            applyTransitionStyles(trans.type, progress, videoRef.current, transitionVideoRef.current)
+          }
+        }
+      }
+    }
+
+    if (rawTime >= seg.outPoint - 0.05) {
       if (nextSeg) {
-        const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
-        if (nextClip?.file) {
+        // If transition B is preloaded, promote it to primary (avoid re-buffering)
+        if (transitionUrlRef.current && transitionVideoRef.current && videoRef.current) {
           cancelPlayRef.current()
           if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-          const url = URL.createObjectURL(nextClip.file)
-          objectUrlRef.current = url
-          videoRef.current.src = url
-          videoRef.current.currentTime = nextSeg.inPoint
+          const tUrl = transitionUrlRef.current
+          const tTime = transitionVideoRef.current.currentTime
+          transitionUrlRef.current = null
+          transitionVideoRef.current.pause()
+          transitionVideoRef.current.src = ''
+          // Restore A styles, hide B
+          videoRef.current.style.opacity = '1'
+          videoRef.current.style.transform = ''
+          videoRef.current.style.clipPath = ''
+          transitionVideoRef.current.style.display = 'none'
+          objectUrlRef.current = tUrl
+          videoRef.current.src = tUrl
+          videoRef.current.currentTime = tTime
           videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
           videoRef.current.playbackRate = nextSeg.speed ?? 1
           videoRef.current.muted = nextSeg.muted ?? false
@@ -136,9 +186,25 @@ export function startVideoTick(params: VideoTickParams): void {
           cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
           activeSegRef.current = nextSeg
         } else {
-          if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
-          setIsPlaying(false)
-          return
+          const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
+          if (nextClip?.file) {
+            cancelPlayRef.current()
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+            const url = URL.createObjectURL(nextClip.file)
+            objectUrlRef.current = url
+            videoRef.current.src = url
+            videoRef.current.currentTime = nextSeg.inPoint
+            videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
+            videoRef.current.playbackRate = nextSeg.speed ?? 1
+            videoRef.current.muted = nextSeg.muted ?? false
+            playAbortRef.current = { cancelled: false }
+            cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+            activeSegRef.current = nextSeg
+          } else {
+            if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
+            setIsPlaying(false)
+            return
+          }
         }
       } else {
         setIsPlaying(false)

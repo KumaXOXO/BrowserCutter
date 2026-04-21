@@ -22,9 +22,14 @@ interface Props {
   zoom: number
 }
 
+const TRANSITION_SYMBOLS: Record<string, string> = {
+  dissolve: '◈', wipe: '|→', slide: '↗', zoom: '⊕', fade: 'A→B',
+}
+
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, removeSegment, updateSegment, projectSettings } = useAppStore()
+  const { selectedElement, setSelectedElement, removeSegment, updateSegment, projectSettings, transitions } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
+  const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
   const px = PX_PER_SEC * zoom
   const left  = segment.startOnTimeline * px
@@ -221,6 +226,21 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
             </>
           )}
         </div>
+      )}
+
+      {/* Transition badge — bottom-right corner when transition is applied after this segment */}
+      {transitionAfter && (
+        <span
+          title={`${transitionAfter.type} transition (${transitionAfter.duration.toFixed(1)}s)`}
+          style={{
+            position: 'absolute', bottom: 2, right: 10,
+            fontSize: 8, color: 'rgba(255,255,255,0.75)',
+            pointerEvents: 'none', zIndex: 4,
+            fontFamily: 'monospace',
+          }}
+        >
+          {TRANSITION_SYMBOLS[transitionAfter.type] ?? transitionAfter.type}
+        </span>
       )}
 
       {/* Right trim handle */}
