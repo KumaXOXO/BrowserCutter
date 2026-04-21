@@ -1,8 +1,9 @@
 // src/components/layout/TopBar.tsx
-import { useState, useEffect, useRef } from 'react'
-import { Undo2, Redo2, Save, FolderOpen } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Undo2, Redo2, Save, FolderOpen, HelpCircle } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import ExportModal from '../export/ExportModal'
+import ShortcutsModal from './ShortcutsModal'
 
 const SAVE_KEY = 'browsercutter_project'
 
@@ -28,7 +29,13 @@ export default function TopBar() {
   const { projectName, setProjectName, undo, redo, canUndo, canRedo, loadProject } = useAppStore()
   const [saved, setSaved] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const showShortcutsRef = useRef(false)
+  useEffect(() => { showShortcutsRef.current = showShortcuts }, [showShortcuts])
+  const showExportRef = useRef(false)
+  useEffect(() => { showExportRef.current = showExport }, [showExport])
+  const handleCloseShortcuts = useCallback(() => setShowShortcuts(false), [])
 
   function handleSave() {
     saveProject()
@@ -63,12 +70,19 @@ export default function TopBar() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (showShortcutsRef.current || showExportRef.current) return
+      const el = document.activeElement
+      const isText = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement)?.isContentEditable
       if (e.code === 'Space' && !e.ctrlKey && !e.metaKey) {
-        const el = document.activeElement
-        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement)?.isContentEditable) return
+        if (isText) return
         e.preventDefault()
         const { isPlaying, setIsPlaying } = useAppStore.getState()
         setIsPlaying(!isPlaying)
+        return
+      }
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !isText) {
+        e.preventDefault()
+        setShowShortcuts((v) => !v)
         return
       }
       if (e.ctrlKey || e.metaKey) {
@@ -110,6 +124,8 @@ export default function TopBar() {
 
       {/* Right: actions */}
       <div className="flex items-center gap-1.5">
+        <IconBtn title="Keyboard shortcuts (?)" onClick={() => setShowShortcuts(true)}><HelpCircle size={14} /></IconBtn>
+        <div className="w-px h-4 mx-0.5" style={{ background: 'var(--border-subtle)' }} />
         <IconBtn title="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo()}><Undo2 size={14} /></IconBtn>
         <IconBtn title="Redo (Ctrl+Y)" onClick={redo} disabled={!canRedo()}><Redo2 size={14} /></IconBtn>
         <div className="w-px h-4 mx-1" style={{ background: 'var(--border-subtle)' }} />
@@ -133,6 +149,7 @@ export default function TopBar() {
         onChange={handleFileSelected}
       />
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+      {showShortcuts && <ShortcutsModal onClose={handleCloseShortcuts} />}
     </div>
   )
 }
