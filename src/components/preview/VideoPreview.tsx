@@ -329,6 +329,7 @@ export default function VideoPreview() {
         className="relative flex items-center justify-center"
         style={{
           aspectRatio: '16/9',
+          width: '100%',
           maxHeight: '100%',
           maxWidth: '100%',
           background: '#000',
