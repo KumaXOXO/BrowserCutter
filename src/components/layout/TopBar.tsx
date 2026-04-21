@@ -93,36 +93,6 @@ export default function TopBar() {
         if (e.key === 's') { e.preventDefault(); handleSave() }
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
         if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
-        if (e.key === 'c' && !isText) {
-          e.preventDefault()
-          const state = useAppStore.getState()
-          const ids = state.selectedSegmentIds.length > 0
-            ? state.selectedSegmentIds
-            : state.selectedElement?.type === 'segment' ? [state.selectedElement.id] : []
-          if (ids.length > 0) {
-            const copied = state.segments.filter((s) => ids.includes(s.id))
-            ;(window as Record<string, unknown>).__clipboardSegments = copied
-          }
-        }
-        if (e.key === 'v' && !isText) {
-          e.preventDefault()
-          const w = window as Record<string, unknown>
-          const copied = w.__clipboardSegments
-          if (Array.isArray(copied) && copied.length > 0) {
-            const { addSegments, segments } = useAppStore.getState()
-            const timelineEnd = segments.length > 0
-              ? Math.max(...segments.map((s) => s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)))
-              : 0
-            const copyStart = Math.min(...copied.map((s: { startOnTimeline: number }) => s.startOnTimeline))
-            const offset = timelineEnd - copyStart + 0.1
-            const pasted = copied.map((s: Record<string, unknown>) => ({
-              ...s,
-              id: crypto.randomUUID(),
-              startOnTimeline: (s.startOnTimeline as number) + offset,
-            }))
-            addSegments(pasted)
-          }
-        }
       }
     }
     window.addEventListener('keydown', onKey)

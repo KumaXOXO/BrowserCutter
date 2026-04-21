@@ -11,7 +11,8 @@ export function getSaveDirName(): string | null { return _saveDir?.name ?? null 
 
 async function pickDir(): Promise<FileSystemDirectoryHandle | null> {
   try {
-    const dir = await window.showDirectoryPicker({ mode: 'readwrite' } as DirectoryPickerOptions)
+    const picker = (window as unknown as { showDirectoryPicker(o: { mode: string }): Promise<FileSystemDirectoryHandle> }).showDirectoryPicker
+    const dir = await picker({ mode: 'readwrite' })
     _saveDir = dir
     return dir
   } catch {
