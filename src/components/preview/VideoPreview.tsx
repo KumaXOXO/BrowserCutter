@@ -110,7 +110,9 @@ export default function VideoPreview() {
     const url = URL.createObjectURL(activeClip.file)
     objectUrlRef.current = url
     video.src = url
-    return () => { if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null } }
+    // Capture url in closure — don't read objectUrlRef at cleanup time because the
+    // RAF tick may have already swapped it to the next segment's URL.
+    return () => { URL.revokeObjectURL(url); if (objectUrlRef.current === url) objectUrlRef.current = null }
   }, [activeClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load image blob URL for image clips — must be state (not ref) to trigger re-render
@@ -130,7 +132,7 @@ export default function VideoPreview() {
     const url = URL.createObjectURL(activeAudioClip.file)
     audioUrlRef.current = url
     audio.src = url
-    return () => { if (audioUrlRef.current) { URL.revokeObjectURL(audioUrlRef.current); audioUrlRef.current = null } }
+    return () => { URL.revokeObjectURL(url); if (audioUrlRef.current === url) audioUrlRef.current = null }
   }, [activeAudioClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Seek video when playhead moves while paused
