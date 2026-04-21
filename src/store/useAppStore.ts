@@ -67,6 +67,7 @@ interface AppState {
   removeAdjustmentLayer: (id: string) => void
 
   addTransition: (transition: Transition) => void
+  updateTransition: (id: string, patch: Partial<Transition>) => void
   removeTransition: (id: string) => void
 
   updateBpmConfig: (patch: Partial<BpmConfig>) => void
@@ -164,6 +165,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeAdjustmentLayer: (id) => set((s) => ({ adjustmentLayers: s.adjustmentLayers.filter((l) => l.id !== id) })),
 
   addTransition: (transition) => set((s) => ({ transitions: [...s.transitions, transition] })),
+  updateTransition: (id, patch) =>
+    set((s) => ({ transitions: s.transitions.map((t) => t.id === id ? { ...t, ...patch } : t) })),
   removeTransition: (id) => set((s) => ({ transitions: s.transitions.filter((t) => t.id !== id) })),
 
   updateBpmConfig: (patch) =>

@@ -31,6 +31,9 @@ export default function VideoPreview() {
 
   const [imgUrl, setImgUrl] = useState<string | null>(null)
 
+  const transitionVideoRef = useRef<HTMLVideoElement>(null)
+  const transitionUrlRef = useRef<string | null>(null)
+
   const playAbortRef = useRef({ cancelled: false })
   const cancelPlayRef = useRef<() => void>(() => {})
 
@@ -262,6 +265,9 @@ export default function VideoPreview() {
         cancelPlayRef,
         playAbortRef,
         masterVolumeRef,
+        transitionVideoRef,
+        transitionUrlRef,
+        transitionsRef,
         setPlayheadPosition,
         setIsPlaying,
       })
@@ -274,6 +280,17 @@ export default function VideoPreview() {
       cancelAnimationFrame(rafRef.current)
       videoRef.current?.pause()
       audioRef.current.pause()
+      // Clean up transition B on stop
+      if (transitionUrlRef.current) { URL.revokeObjectURL(transitionUrlRef.current); transitionUrlRef.current = null }
+      if (transitionVideoRef.current) {
+        transitionVideoRef.current.pause()
+        transitionVideoRef.current.src = ''
+        transitionVideoRef.current.style.display = 'none'
+        transitionVideoRef.current.style.opacity = '0'
+        transitionVideoRef.current.style.transform = ''
+        transitionVideoRef.current.style.clipPath = ''
+      }
+      if (videoRef.current) { videoRef.current.style.opacity = '1'; videoRef.current.style.transform = ''; videoRef.current.style.clipPath = '' }
     }
   }, [isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -300,6 +317,12 @@ export default function VideoPreview() {
             filter: buildCSSFilter(activeSeg?.effects ?? []) || undefined,
             display: isImageClip ? 'none' : undefined,
           }}
+        />
+        {/* Transition overlay — second video element for dissolve/wipe/slide/zoom */}
+        <video
+          ref={transitionVideoRef}
+          muted
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'none', opacity: 0 }}
         />
         {/* Image clip display */}
         {isImageClip && imgUrl && (
