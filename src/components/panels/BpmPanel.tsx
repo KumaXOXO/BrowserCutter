@@ -20,14 +20,18 @@ const SEGMENT_LENGTHS: { value: SegmentLength; label: string }[] = [
 ]
 
 export default function BpmPanel() {
-  const { bpmConfig, clips, updateBpmConfig, replaceSegments, setPlayheadPosition, setIsPlaying } = useAppStore()
+  const { bpmConfig, clips, tracks, segments, updateBpmConfig, addSegments, replaceSegments, setPlayheadPosition, setIsPlaying } = useAppStore()
   const [detecting, setDetecting] = useState(false)
+  const [appendMode, setAppendMode] = useState(true)
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
   const videoClips = clips.filter((c) => c.type === 'video')
+  const videoTracks = tracks.filter((t) => t.type === 'video')
+  const [selectedTrackId, setSelectedTrackId] = useState<string>(() => videoTracks[0]?.id ?? 'v1')
+  const selectedTrack = videoTracks.find((t) => t.id === selectedTrackId) ?? videoTracks[0]
 
   return (
     <div className="flex flex-col gap-4 p-3.5 overflow-y-auto h-full">
@@ -177,6 +181,31 @@ export default function BpmPanel() {
         </div>
       </div>
 
+      {/* Target track + insert mode */}
+      {videoTracks.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div>
+            <PanelLabel>Target Track</PanelLabel>
+            <select
+              className="inp mt-1.5"
+              value={selectedTrackId}
+              onChange={(e) => setSelectedTrackId(e.target.value)}
+            >
+              {videoTracks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-xs" style={{ color: 'var(--muted2)' }}>
+            <input
+              type="checkbox"
+              checked={appendMode}
+              style={{ accentColor: '#E11D48' }}
+              onChange={(e) => setAppendMode(e.target.checked)}
+            />
+            Append to timeline (instead of replace)
+          </label>
+        </div>
+      )}
+
       {/* Generate button */}
       <button
         className="w-full rounded-xl font-bold text-sm text-white cursor-pointer transition-all duration-200 relative overflow-hidden"
@@ -186,15 +215,24 @@ export default function BpmPanel() {
         onMouseDown={(e)  => { e.currentTarget.style.transform = 'scale(0.98)' }}
         onMouseUp={(e)    => { e.currentTarget.style.transform = 'translateY(-2px)' }}
         onClick={() => {
-          const newSegments = generateCut(clips, bpmConfig)
+          const trackIdx = selectedTrack?.trackIndex ?? 0
+          const trackSegs = segments.filter((s) => s.trackIndex === trackIdx)
+          const startOffset = appendMode && trackSegs.length > 0
+            ? Math.max(...trackSegs.map((s) => s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)))
+            : 0
+          const newSegments = generateCut(clips, bpmConfig, trackIdx, startOffset)
           if (newSegments.length > 0) {
-            replaceSegments(newSegments)
-            setPlayheadPosition(0)
+            if (appendMode) {
+              addSegments(newSegments)
+            } else {
+              replaceSegments(newSegments, trackIdx)
+            }
             setIsPlaying(false)
+            if (!appendMode) setPlayheadPosition(0)
           }
         }}
       >
-        Generate Cut
+        {appendMode ? 'Append Cut' : 'Replace Cut'}
       </button>
     </div>
   )

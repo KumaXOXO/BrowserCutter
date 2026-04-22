@@ -9,6 +9,7 @@ import type {
 interface TimelineSnapshot {
   segments: Segment[]
   textOverlays: TextOverlay[]
+  transitions: Transition[]
 }
 
 const MAX_HISTORY = 50
@@ -69,9 +70,10 @@ interface AppState {
 
   addSegment: (segment: Segment) => void
   removeSegment: (id: SegmentId) => void
+  removeSegments: (ids: string[]) => void
   updateSegment: (id: SegmentId, patch: Partial<Segment>) => void
   addSegments: (segments: Segment[]) => void
-  replaceSegments: (segments: Segment[]) => void
+  replaceSegments: (segments: Segment[], targetTrackIndex?: number) => void
 
   addTextOverlay: (overlay: TextOverlay) => void
   updateTextOverlay: (id: string, patch: Partial<TextOverlay>) => void
@@ -102,7 +104,7 @@ interface AppState {
 // Snapshot current timeline state before a mutation
 function push(s: AppState) {
   return {
-    _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays }],
+    _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays, transitions: s.transitions }],
     _future: [] as TimelineSnapshot[],
   }
 }
@@ -133,6 +135,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ─── Tracks ───
   tracks: [
     { id: 'v1', name: 'V1', type: 'video', trackIndex: 0 },
+    { id: 'v2', name: 'V2', type: 'video', trackIndex: 3 },
+    { id: 'v3', name: 'V3', type: 'video', trackIndex: 4 },
     { id: 'text', name: 'Text', type: 'subtitle', trackIndex: 1 },
     { id: 'adj', name: 'Adjustment', type: 'adjustment', trackIndex: -1 },
     { id: 'audio', name: 'Audio', type: 'audio', trackIndex: 2 },
@@ -197,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addSegment: (segment) => set((s) => ({ ...push(s), segments: [...s.segments, segment] })),
   removeSegment: (id) => set((s) => ({ ...push(s), segments: s.segments.filter((seg) => seg.id !== id) })),
+  removeSegments: (ids) => set((s) => ({ ...push(s), segments: s.segments.filter((seg) => !ids.includes(seg.id)) })),
   updateSegment: (id, patch) =>
     set((s) => {
       const segments = s.segments.map((seg) => seg.id === id ? { ...seg, ...patch } : seg)
@@ -211,8 +216,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...push(s), segments, playheadPosition }
     }),
   addSegments: (newSegs) => set((s) => ({ ...push(s), segments: [...s.segments, ...newSegs] })),
-  replaceSegments: (newSegs) =>
-    set((s) => ({ ...push(s), segments: [...s.segments.filter((seg) => seg.trackIndex !== 0), ...newSegs] })),
+  replaceSegments: (newSegs, targetTrackIndex = 0) =>
+    set((s) => ({ ...push(s), segments: [...s.segments.filter((seg) => seg.trackIndex !== targetTrackIndex), ...newSegs] })),
 
   addTextOverlay: (overlay) => set((s) => ({ ...push(s), textOverlays: [...s.textOverlays, overlay] })),
   updateTextOverlay: (id, patch) =>
@@ -270,7 +275,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return {
       ...prev,
       _history: s._history.slice(0, -1),
-      _future: [{ segments: s.segments, textOverlays: s.textOverlays }, ...s._future.slice(0, MAX_HISTORY - 1)],
+      _future: [{ segments: s.segments, textOverlays: s.textOverlays, transitions: s.transitions }, ...s._future.slice(0, MAX_HISTORY - 1)],
     }
   }),
 
@@ -279,7 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = s._future[0]
     return {
       ...next,
-      _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays }],
+      _history: [...s._history.slice(-(MAX_HISTORY - 1)), { segments: s.segments, textOverlays: s.textOverlays, transitions: s.transitions }],
       _future: s._future.slice(1),
     }
   }),

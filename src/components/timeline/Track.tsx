@@ -68,6 +68,8 @@ export default function Track({ trackIndex, trackType, label, icon, height, zoom
       <div
         className="relative h-full"
         style={{ width: totalWidth }}
+        data-track-index={trackIndex}
+        data-track-type={trackType}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >

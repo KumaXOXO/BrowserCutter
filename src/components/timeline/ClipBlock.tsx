@@ -27,7 +27,7 @@ const TRANSITION_SYMBOLS: Record<string, string> = {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, removeSegment, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments } = useAppStore()
+  const { selectedElement, setSelectedElement, removeSegment, removeSegments, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
   const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
@@ -53,6 +53,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       if (selectedElement?.type !== 'segment') return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
+        if (selectedSegmentIds.length > 0) return // let global handler in Timeline take over
         setSelectedElement(null)
         removeSegment(segment.id)
       } else if (e.key === 'h' || e.key === 'H') {
@@ -72,22 +73,33 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     e.stopPropagation()
 
     if (e.ctrlKey || e.metaKey) {
-      // Ctrl+click: toggle this clip in multi-select
       toggleSegmentSelection(segment.id)
       return
     }
 
     if (e.shiftKey) {
-      // Shift+click: range select between last selected and this clip (same track)
+      // Shift+click: range select across all tracks between anchor and this clip
       const anchorId = selectedElement?.id ?? selectedSegmentIds[selectedSegmentIds.length - 1]
       const anchor = segments.find((s) => s.id === anchorId)
-      if (anchor && anchor.trackIndex === segment.trackIndex) {
-        const trackSegs = segments
-          .filter((s) => s.trackIndex === segment.trackIndex)
-          .sort((a, b) => a.startOnTimeline - b.startOnTimeline)
-        const aIdx = trackSegs.findIndex((s) => s.id === anchor.id)
-        const bIdx = trackSegs.findIndex((s) => s.id === segment.id)
-        const range = trackSegs.slice(Math.min(aIdx, bIdx), Math.max(aIdx, bIdx) + 1)
+      if (anchor) {
+        // Same track: range by position
+        if (anchor.trackIndex === segment.trackIndex) {
+          const trackSegs = segments
+            .filter((s) => s.trackIndex === segment.trackIndex)
+            .sort((a, b) => a.startOnTimeline - b.startOnTimeline)
+          const aIdx = trackSegs.findIndex((s) => s.id === anchor.id)
+          const bIdx = trackSegs.findIndex((s) => s.id === segment.id)
+          const range = trackSegs.slice(Math.min(aIdx, bIdx), Math.max(aIdx, bIdx) + 1)
+          setSelectedSegmentIds(range.map((s) => s.id))
+          return
+        }
+        // Cross-track: select all clips between the two time positions across all tracks
+        const minTime = Math.min(anchor.startOnTimeline, segment.startOnTimeline)
+        const maxTime = Math.max(
+          anchor.startOnTimeline + (anchor.outPoint - anchor.inPoint) / Math.max(0.01, anchor.speed ?? 1),
+          segment.startOnTimeline + (segment.outPoint - segment.inPoint) / Math.max(0.01, segment.speed ?? 1),
+        )
+        const range = segments.filter((s) => s.startOnTimeline >= minTime && s.startOnTimeline < maxTime)
         setSelectedSegmentIds(range.map((s) => s.id))
         return
       }
@@ -95,31 +107,67 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       return
     }
 
-    // Normal click: single select and drag
-    // Capture multi-selection BEFORE clearing it so dragging a selected clip moves the whole group
+    // Normal click: single select and drag (with cross-timeline track detection)
     const multiIds = selectedSegmentIds.includes(segment.id) ? selectedSegmentIds : [segment.id]
     setSelectedElement({ type: 'segment', id: segment.id })
     setSelectedSegmentIds([])
 
     const trackContent = (e.currentTarget as HTMLElement).parentElement!
     const trackRect = trackContent.getBoundingClientRect()
-    const offsetX = e.clientX - trackRect.left - left
+    const scrollContainer = trackContent.closest('.overflow-auto') as HTMLElement | null
+    const scrollLeft = scrollContainer?.scrollLeft ?? 0
+    const offsetX = e.clientX - trackRect.left + scrollLeft - left
     const startPositions = Object.fromEntries(
       segments.filter((s) => multiIds.includes(s.id)).map((s) => [s.id, s.startOnTimeline])
     )
+    const startTrackIndices = Object.fromEntries(
+      segments.filter((s) => multiIds.includes(s.id)).map((s) => [s.id, s.trackIndex])
+    )
+
+    // Set pointer-events:none on this element so elementsFromPoint can see tracks below
+    const dragEl = e.currentTarget as HTMLElement
+    dragEl.style.pointerEvents = 'none'
 
     const handleMouseMove = (ev: MouseEvent) => {
-      const newStart = Math.max(0, (ev.clientX - trackRect.left - offsetX) / px)
+      const curScroll = scrollContainer?.scrollLeft ?? 0
+      const newStart = Math.max(0, (ev.clientX - trackRect.left + curScroll - offsetX) / px)
       const primaryDelta = newStart - (startPositions[segment.id] ?? segment.startOnTimeline)
+
+      // Detect target track under cursor for cross-timeline drag
+      const els = document.elementsFromPoint(ev.clientX, ev.clientY)
+      const trackEl = els.find((el) => el instanceof HTMLElement && el.dataset.trackIndex !== undefined) as HTMLElement | undefined
+      const targetTrackIndex = trackEl ? parseInt(trackEl.dataset.trackIndex!, 10) : null
+      const targetTrackType = trackEl?.dataset.trackType ?? null
+
       if (multiIds.length > 1) {
         multiIds.forEach((id) => {
-          updateSegment(id, { startOnTimeline: Math.max(0, (startPositions[id] ?? 0) + primaryDelta) })
+          const patch: Partial<typeof segment> = { startOnTimeline: Math.max(0, (startPositions[id] ?? 0) + primaryDelta) }
+          // Only move to target track if types are compatible
+          if (targetTrackIndex !== null && targetTrackType !== null) {
+            const segForId = segments.find((s) => s.id === id)
+            const clipForSeg = segForId ? clips.find((c) => c.id === segForId.clipId) : undefined
+            if (clipForSeg && ((clipForSeg.type === 'video' || clipForSeg.type === 'image') && targetTrackType === 'video')) {
+              patch.trackIndex = targetTrackIndex
+            } else if (clipForSeg && clipForSeg.type === 'audio' && targetTrackType === 'audio') {
+              patch.trackIndex = targetTrackIndex
+            }
+          }
+          updateSegment(id, patch)
         })
       } else {
-        updateSegment(segment.id, { startOnTimeline: newStart })
+        const patchSingle: Partial<typeof segment> = { startOnTimeline: newStart }
+        if (targetTrackIndex !== null && targetTrackType !== null) {
+          if ((clip.type === 'video' || clip.type === 'image') && targetTrackType === 'video') {
+            patchSingle.trackIndex = targetTrackIndex
+          } else if (clip.type === 'audio' && targetTrackType === 'audio') {
+            patchSingle.trackIndex = targetTrackIndex
+          }
+        }
+        updateSegment(segment.id, patchSingle)
       }
     }
     const handleMouseUp = () => {
+      dragEl.style.pointerEvents = ''
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }

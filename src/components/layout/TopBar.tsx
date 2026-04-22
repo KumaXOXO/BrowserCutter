@@ -24,11 +24,48 @@ export default function TopBar() {
   const [saveDirName, setSaveDirName] = useState<string | null>(getSaveDirName())
   const [showExport, setShowExport] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const hasUnsavedRef = useRef(hasUnsavedChanges)
+  useEffect(() => { hasUnsavedRef.current = hasUnsavedChanges }, [hasUnsavedChanges])
   const showShortcutsRef = useRef(false)
   useEffect(() => { showShortcutsRef.current = showShortcuts }, [showShortcuts])
   const showExportRef = useRef(false)
   useEffect(() => { showExportRef.current = showExport }, [showExport])
+  // Track unsaved changes by watching mutable timeline state references
+  useEffect(() => {
+    let prevSegments = useAppStore.getState().segments
+    let prevClips = useAppStore.getState().clips
+    let prevTextOverlays = useAppStore.getState().textOverlays
+    let prevTransitions = useAppStore.getState().transitions
+    const unsub = useAppStore.subscribe((state) => {
+      if (
+        state.segments !== prevSegments ||
+        state.clips !== prevClips ||
+        state.textOverlays !== prevTextOverlays ||
+        state.transitions !== prevTransitions
+      ) {
+        prevSegments = state.segments
+        prevClips = state.clips
+        prevTextOverlays = state.textOverlays
+        prevTransitions = state.transitions
+        setHasUnsavedChanges(true)
+      }
+    })
+    return unsub
+  }, [])
+
+  // Warn before leaving when there are unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
   const helpBtnRef = useRef<HTMLButtonElement>(null)
   const handleCloseShortcuts = useCallback(() => {
     setShowShortcuts(false)
@@ -41,6 +78,7 @@ export default function TopBar() {
       setSavedOnce(true)
       setSaveDirName(getSaveDirName())
       setSaved(true)
+      setHasUnsavedChanges(false)
       setTimeout(() => setSaved(false), 1800)
     } else if (result.reason !== 'cancelled') {
       alert(`Save failed: ${result.reason}`)
@@ -140,6 +178,9 @@ export default function TopBar() {
         <GhostBtn onClick={handleSave}>
           <Save size={13} />
           {saved ? 'Saved!' : saveDirName ? `Save (${saveDirName})` : 'Save'}
+          {hasUnsavedChanges && !saved && (
+            <span title="Unsaved changes" style={{ width: 6, height: 6, borderRadius: '50%', background: '#E11D48', display: 'inline-block', marginLeft: 2, flexShrink: 0 }} />
+          )}
         </GhostBtn>
         <PrimaryBtn
           onClick={() => setShowExport(true)}

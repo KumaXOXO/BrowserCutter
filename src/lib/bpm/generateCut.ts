@@ -2,7 +2,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Clip, Segment, BpmConfig } from '../../types'
 
-export function generateCut(clips: Clip[], config: BpmConfig): Segment[] {
+export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex = 0, startOffset = 0): Segment[] {
   const { bpm, mode, segmentLength, outputDuration, outputUnit, selectedClipIds } = config
 
   const pool = clips.filter((c) => selectedClipIds.includes(c.id) && c.type === 'video')
@@ -12,9 +12,16 @@ export function generateCut(clips: Clip[], config: BpmConfig): Segment[] {
   const segDuration = beatDuration * segmentLength
   const totalSeconds = outputUnit === 'beats' ? outputDuration * beatDuration : outputDuration
 
-  if (mode === 'sequential') return generateSequential(pool, segDuration, totalSeconds)
-  if (mode === 'random') return generateRandom(pool, segDuration, totalSeconds)
-  return generateForfeit(pool, segDuration, totalSeconds)
+  let segs: Segment[]
+  if (mode === 'sequential') segs = generateSequential(pool, segDuration, totalSeconds)
+  else if (mode === 'random') segs = generateRandom(pool, segDuration, totalSeconds)
+  else segs = generateForfeit(pool, segDuration, totalSeconds)
+
+  return segs.map((s) => ({
+    ...s,
+    trackIndex: targetTrackIndex,
+    startOnTimeline: s.startOnTimeline + startOffset,
+  }))
 }
 
 function generateSequential(pool: Clip[], segDuration: number, totalSeconds: number): Segment[] {
@@ -55,37 +62,38 @@ function generateSequential(pool: Clip[], segDuration: number, totalSeconds: num
 }
 
 function generateRandom(pool: Clip[], segDuration: number, totalSeconds: number): Segment[] {
-  const segments: Segment[] = []
-  const bookmarks: Record<string, number> = Object.fromEntries(pool.map((c) => [c.id, 0]))
-  let timeline = 0
-  const available = [...pool]
-
-  while (timeline < totalSeconds - 0.001 && available.length > 0) {
-    const idx = Math.floor(Math.random() * available.length)
-    const clip = available[idx]
-    const inPoint = bookmarks[clip.id]
-    const remaining = clip.duration - inPoint
-
-    if (remaining <= 0.001) {
-      available.splice(idx, 1)
-      continue
+  // Build all possible beat segments from every clip in the pool
+  const allSlices: { clipId: string; inPoint: number; outPoint: number }[] = []
+  for (const clip of pool) {
+    let cursor = 0
+    while (cursor < clip.duration - 0.1) {
+      const outPoint = Math.min(cursor + segDuration, clip.duration)
+      allSlices.push({ clipId: clip.id, inPoint: cursor, outPoint })
+      cursor = outPoint
     }
-
-    const duration = Math.min(segDuration, remaining, totalSeconds - timeline)
-
+  }
+  // Fisher-Yates shuffle
+  for (let i = allSlices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[allSlices[i], allSlices[j]] = [allSlices[j], allSlices[i]]
+  }
+  // Sequence shuffled slices up to totalSeconds
+  const segments: Segment[] = []
+  let timeline = 0
+  for (const slice of allSlices) {
+    if (timeline >= totalSeconds - 0.001) break
+    const duration = Math.min(slice.outPoint - slice.inPoint, totalSeconds - timeline)
+    if (duration < 0.001) continue
     segments.push({
       id: uuidv4(),
-      clipId: clip.id,
+      clipId: slice.clipId,
       trackIndex: 0,
       startOnTimeline: timeline,
-      inPoint,
-      outPoint: inPoint + duration,
+      inPoint: slice.inPoint,
+      outPoint: slice.inPoint + duration,
     })
-
-    bookmarks[clip.id] = inPoint + duration
     timeline += duration
   }
-
   return segments
 }
 

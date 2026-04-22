@@ -342,6 +342,7 @@ export default function VideoPreview() {
           ref={videoRef}
           playsInline
           preload="auto"
+          loop={false}
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000',
             filter: buildCSSFilter(activeSeg?.effects ?? []) || undefined,

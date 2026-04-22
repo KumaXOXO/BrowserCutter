@@ -1,5 +1,5 @@
 // src/components/timeline/Timeline.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2 } from 'lucide-react'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
@@ -34,6 +34,46 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
   const [zoom, setZoom] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
   const { playheadPosition, tracks, addTrack, updateTrack, removeTrack, moveTrack } = useAppStore()
+
+  // Global multi-select keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const { selectedSegmentIds, selectedElement, segments, setSelectedSegmentIds, removeSegments, setSelectedElement } = useAppStore.getState()
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSegmentIds.length > 0) {
+        e.preventDefault()
+        removeSegments(selectedSegmentIds)
+        setSelectedSegmentIds([])
+        setSelectedElement(null)
+        return
+      }
+
+      // Shift+A: select all clips in the track of the current selection
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && e.key === 'A') {
+        e.preventDefault()
+        const anchorId = selectedElement?.id ?? selectedSegmentIds[selectedSegmentIds.length - 1]
+        const anchor = segments.find((s) => s.id === anchorId)
+        if (anchor) {
+          const trackSegs = segments.filter((s) => s.trackIndex === anchor.trackIndex)
+          setSelectedSegmentIds(trackSegs.map((s) => s.id))
+        }
+        return
+      }
+
+      // Ctrl+Shift+A: select all clips in all video tracks
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault()
+        const { tracks: allTracks } = useAppStore.getState()
+        const videoTrackIndices = new Set(allTracks.filter((t) => t.type === 'video').map((t) => t.trackIndex))
+        const videoSegs = segments.filter((s) => videoTrackIndices.has(s.trackIndex))
+        setSelectedSegmentIds(videoSegs.map((s) => s.id))
+        return
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
   const playheadLeft = TRACK_LABEL_WIDTH + playheadPosition * PX_PER_SEC * zoom
 
   function handleAddTrack(type: TimelineTrack['type']) {
@@ -46,12 +86,19 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       adjustment: `FX ${count}`,
       subtitle: `Sub ${count}`,
     }
-    addTrack({
+    const newTrack: TimelineTrack = {
       id: crypto.randomUUID(),
       name: nameMap[type],
       type,
       trackIndex: type === 'adjustment' || type === 'subtitle' ? -(nextIndex) : nextIndex,
-    })
+    }
+    // Insert after the last track of the same type
+    const lastSameTypeIdx = tracks.reduce((best, t, i) => t.type === type ? i : best, -1)
+    const insertAfter = lastSameTypeIdx >= 0 ? lastSameTypeIdx : tracks.length - 1
+    // addTrack appends; we reorder immediately via a custom insert
+    const newTracks = [...tracks]
+    newTracks.splice(insertAfter + 1, 0, newTrack)
+    useAppStore.setState({ tracks: newTracks })
     setShowAddModal(false)
   }
 

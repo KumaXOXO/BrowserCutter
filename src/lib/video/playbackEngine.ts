@@ -211,45 +211,75 @@ export function startVideoTick(params: VideoTickParams): void {
       }
     }
 
-    if (rawTime >= seg.outPoint - 0.05) {
+    // Speed-adjusted threshold: at 2x speed we cover 0.15s of source in ~75ms real time.
+    // Use a larger window scaled by speed so the swap fires in time regardless of playback rate.
+    const swapThreshold = Math.max(0.15, 0.15 * (seg.speed ?? 1))
+    if (rawTime >= seg.outPoint - swapThreshold) {
       if (nextSeg) {
         // If transition B is preloaded, promote it to primary (avoid re-buffering)
         if (transitionUrlRef.current && transitionVideoRef.current && videoRef.current) {
           cancelPlayRef.current()
-          if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-          const tUrl = transitionUrlRef.current
-          const tTime = transitionVideoRef.current.currentTime
-          transitionUrlRef.current = null
-          transitionVideoRef.current.pause()
-          transitionVideoRef.current.src = ''
-          // Restore A styles, hide B
-          videoRef.current.style.opacity = '1'
-          videoRef.current.style.transform = ''
-          videoRef.current.style.clipPath = ''
-          transitionVideoRef.current.style.display = 'none'
-          objectUrlRef.current = tUrl
-          videoRef.current.src = tUrl
-          videoRef.current.currentTime = tTime
-          videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
-          videoRef.current.playbackRate = nextSeg.speed ?? 1
-          videoRef.current.muted = nextSeg.muted ?? false
-          playAbortRef.current = { cancelled: false }
-          cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
-          activeSegRef.current = nextSeg
-        } else {
-          const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
-          if (nextClip?.file) {
-            cancelPlayRef.current()
-            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-            const url = URL.createObjectURL(nextClip.file)
-            objectUrlRef.current = url
-            videoRef.current.src = url
+          const nextClipForT = clipsRef.current.find((c) => c.id === nextSeg.clipId)
+          // Same-clip check for transition-promoted segment: if same clip, just seek
+          if (nextClipForT?.id === seg.clipId && objectUrlRef.current) {
+            transitionUrlRef.current = null
+            transitionVideoRef.current.pause()
+            transitionVideoRef.current.src = ''
+            videoRef.current.style.opacity = '1'
+            videoRef.current.style.transform = ''
+            videoRef.current.style.clipPath = ''
+            transitionVideoRef.current.style.display = 'none'
             videoRef.current.currentTime = nextSeg.inPoint
             videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
             videoRef.current.playbackRate = nextSeg.speed ?? 1
             videoRef.current.muted = nextSeg.muted ?? false
             playAbortRef.current = { cancelled: false }
             cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+          } else {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+            const tUrl = transitionUrlRef.current
+            const tTime = transitionVideoRef.current.currentTime
+            transitionUrlRef.current = null
+            transitionVideoRef.current.pause()
+            transitionVideoRef.current.src = ''
+            videoRef.current.style.opacity = '1'
+            videoRef.current.style.transform = ''
+            videoRef.current.style.clipPath = ''
+            transitionVideoRef.current.style.display = 'none'
+            objectUrlRef.current = tUrl
+            videoRef.current.src = tUrl
+            videoRef.current.currentTime = tTime
+            videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
+            videoRef.current.playbackRate = nextSeg.speed ?? 1
+            videoRef.current.muted = nextSeg.muted ?? false
+            playAbortRef.current = { cancelled: false }
+            cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+          }
+          activeSegRef.current = nextSeg
+        } else {
+          const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
+          if (nextClip?.file) {
+            cancelPlayRef.current()
+            // Same-clip optimization: skip URL revoke/recreate, just seek within the current buffer
+            if (nextClip.id === seg.clipId && objectUrlRef.current && videoRef.current) {
+              videoRef.current.currentTime = nextSeg.inPoint
+              videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
+              videoRef.current.playbackRate = nextSeg.speed ?? 1
+              videoRef.current.muted = nextSeg.muted ?? false
+              playAbortRef.current = { cancelled: false }
+              cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+            } else {
+              if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+              const url = URL.createObjectURL(nextClip.file)
+              objectUrlRef.current = url
+              videoRef.current!.src = url
+              videoRef.current!.currentTime = nextSeg.inPoint
+              videoRef.current!.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
+              videoRef.current!.playbackRate = nextSeg.speed ?? 1
+              videoRef.current!.muted = nextSeg.muted ?? false
+              playAbortRef.current = { cancelled: false }
+              cancelPlayRef.current = playWhenReady(videoRef.current!, () => setIsPlaying(false), playAbortRef.current)
+            }
             activeSegRef.current = nextSeg
           } else {
             if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }

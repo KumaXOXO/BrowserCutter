@@ -27,8 +27,6 @@ export async function ensureSaveDir(): Promise<FileSystemDirectoryHandle | null>
 
 export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string }> {
   const { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips, tracks } = useAppStore.getState()
-  const serializedClips = clips.map(({ file: _f, ...meta }) => meta)
-  const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips: serializedClips, tracks, savedAt: Date.now() }
 
   if ('showDirectoryPicker' in window) {
     if (!_saveDir) {
@@ -36,6 +34,22 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string 
       if (!dir) return { ok: false, reason: 'cancelled' }
     }
     try {
+      // Copy media files to media/ subdirectory
+      const mediaDir = await _saveDir!.getDirectoryHandle('media', { create: true })
+      const serializedClips = await Promise.all(clips.map(async ({ file, ...meta }) => {
+        if (!file) return meta
+        try {
+          const fh = await mediaDir.getFileHandle(file.name, { create: true })
+          const writable = await fh.createWritable()
+          await writable.write(await file.arrayBuffer())
+          await writable.close()
+          return { ...meta, mediaPath: `media/${file.name}` }
+        } catch {
+          return meta
+        }
+      }))
+
+      const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips: serializedClips, tracks, savedAt: Date.now() }
       const fh = await _saveDir!.getFileHandle('project.json', { create: true })
       const writable = await fh.createWritable()
       await writable.write(JSON.stringify(data, null, 2))
@@ -50,7 +64,9 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string 
       return { ok: false, reason: e instanceof Error ? e.message : String(e) }
     }
   } else {
-    // Fallback: download JSON
+    // Fallback: download JSON (no media bundling without directory access)
+    const serializedClips = clips.map(({ file: _f, ...meta }) => meta)
+    const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips: serializedClips, tracks, savedAt: Date.now() }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
