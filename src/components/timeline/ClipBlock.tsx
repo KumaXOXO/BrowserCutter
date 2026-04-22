@@ -27,7 +27,7 @@ const TRANSITION_SYMBOLS: Record<string, string> = {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, removeSegment, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips } = useAppStore()
+  const { selectedElement, setSelectedElement, removeSegment, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips, timelineMode, resizeEnabled } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
   const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
@@ -71,6 +71,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
   // Move drag: mousedown on body
   const handleBodyMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation()
+
+    if (timelineMode === 'playhead') return
 
     if (e.ctrlKey || e.metaKey) {
       toggleSegmentSelection(segment.id)
@@ -174,6 +176,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
   // Left trim: changes inPoint + startOnTimeline together (right edge stays fixed)
   const handleLeftTrimMouseDown = (e: React.MouseEvent) => {
+    if (timelineMode !== 'selection' || !resizeEnabled) return
     e.stopPropagation()
     const startX = e.clientX
     const initialInPoint = segRef.current.inPoint
@@ -196,6 +199,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
   // Right trim: changes outPoint only (left edge stays fixed)
   const handleRightTrimMouseDown = (e: React.MouseEvent) => {
+    if (timelineMode !== 'selection' || !resizeEnabled) return
     e.stopPropagation()
     const startX = e.clientX
     const initialOutPoint = segRef.current.outPoint
@@ -271,7 +275,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         left, width,
         borderRadius: 5,
         background: bg,
-        cursor: 'grab',
+        cursor: timelineMode === 'playhead' ? 'default' : 'grab',
         display: 'flex',
         alignItems: 'center',
         overflow: 'hidden',
@@ -290,16 +294,18 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       {/* Waveform canvas — z-index 2, all clip types */}
       <WaveformCanvas clipId={clip.id} file={clip.file ?? null} />
 
-      {/* Left trim handle */}
-      <div
-        onMouseDown={handleLeftTrimMouseDown}
-        style={{
-          position: 'absolute', left: 0, top: 0, bottom: 0, width: 8,
-          cursor: 'ew-resize', zIndex: 2,
-          background: 'rgba(255,255,255,0.25)',
-          borderRadius: '5px 0 0 5px',
-        }}
-      />
+      {/* Left trim handle — only shown when resize is enabled */}
+      {timelineMode === 'selection' && resizeEnabled && (
+        <div
+          onMouseDown={handleLeftTrimMouseDown}
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: 8,
+            cursor: 'ew-resize', zIndex: 2,
+            background: 'rgba(255,255,255,0.25)',
+            borderRadius: '5px 0 0 5px',
+          }}
+        />
+      )}
 
       <span style={{
         fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)',
@@ -309,6 +315,16 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         {label}
       </span>
 
+      {/* Missing file badge — shown when clip has no file (after project load) */}
+      {!clip.file && (
+        <span title="File not linked — re-import in Media tab" style={{
+          position: 'absolute', top: 3, right: 10,
+          fontSize: 8, color: 'rgba(255,200,0,0.9)', pointerEvents: 'none', zIndex: 4,
+          background: 'rgba(0,0,0,0.5)', padding: '1px 3px', borderRadius: 2,
+        }}>
+          !
+        </span>
+      )}
       {/* Mute badge — always visible when muted */}
       {segment.muted && (
         <span style={{
@@ -334,16 +350,18 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         </span>
       )}
 
-      {/* Right trim handle */}
-      <div
-        onMouseDown={handleRightTrimMouseDown}
-        style={{
-          position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
-          cursor: 'ew-resize', zIndex: 2,
-          background: 'rgba(255,255,255,0.25)',
-          borderRadius: '0 5px 5px 0',
-        }}
-      />
+      {/* Right trim handle — only shown when resize is enabled */}
+      {timelineMode === 'selection' && resizeEnabled && (
+        <div
+          onMouseDown={handleRightTrimMouseDown}
+          style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
+            cursor: 'ew-resize', zIndex: 2,
+            background: 'rgba(255,255,255,0.25)',
+            borderRadius: '0 5px 5px 0',
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -15,6 +15,7 @@ export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex =
   let segs: Segment[]
   if (mode === 'sequential') segs = generateSequential(pool, segDuration, totalSeconds)
   else if (mode === 'random') segs = generateRandom(pool, segDuration, totalSeconds)
+  else if (mode === 'normal') segs = generateNormal(pool, segDuration, totalSeconds)
   else segs = generateForfeit(pool, segDuration, totalSeconds)
 
   return segs.map((s) => ({
@@ -93,6 +94,30 @@ function generateRandom(pool: Clip[], segDuration: number, totalSeconds: number)
       outPoint: slice.inPoint + duration,
     })
     timeline += duration
+  }
+  return segments
+}
+
+function generateNormal(pool: Clip[], segDuration: number, totalSeconds: number): Segment[] {
+  const segments: Segment[] = []
+  let timeline = 0
+  for (const clip of pool) {
+    if (timeline >= totalSeconds - 0.001) break
+    let cursor = 0
+    while (cursor < clip.duration - 0.001 && timeline < totalSeconds - 0.001) {
+      const duration = Math.min(segDuration, clip.duration - cursor, totalSeconds - timeline)
+      if (duration < 0.001) break
+      segments.push({
+        id: uuidv4(),
+        clipId: clip.id,
+        trackIndex: 0,
+        startOnTimeline: timeline,
+        inPoint: cursor,
+        outPoint: cursor + duration,
+      })
+      cursor += duration
+      timeline += duration
+    }
   }
   return segments
 }

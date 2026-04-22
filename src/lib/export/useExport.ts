@@ -49,6 +49,13 @@ export function useExport(): ExportState {
     const clipData: Record<string, { buffer: ArrayBuffer; name: string }> = {}
     const needed = new Set(videoSegs.map((s) => s.clipId))
 
+    const missingFiles = clips.filter((c) => needed.has(c.id) && !c.file).map((c) => c.name)
+    if (missingFiles.length > 0) {
+      setErrorMsg(`Cannot export: ${missingFiles.length} clip(s) have no source file. Re-import them in the Media tab: ${missingFiles.slice(0, 3).join(', ')}${missingFiles.length > 3 ? '…' : ''}`)
+      setStatus('error')
+      return
+    }
+
     for (const clip of clips) {
       if (!needed.has(clip.id)) continue
       if (!clip.file) continue

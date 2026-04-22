@@ -4,8 +4,8 @@ export type ClipId = string
 export type SegmentId = string
 
 export type ClipType = 'video' | 'audio' | 'image'
-export type BpmMode = 'sequential' | 'random' | 'forfeit'
-export type SegmentLength = 0.5 | 1 | 2 | 4
+export type BpmMode = 'sequential' | 'random' | 'forfeit' | 'normal'
+export type SegmentLength = number
 export type ActiveTab = 'media' | 'text' | 'effects' | 'transitions' | 'bpm' | 'settings' | 'inspector'
 export type MediaSubTab = 'videos' | 'music' | 'images'
 export type EffectType = 'brightness' | 'contrast' | 'saturation' | 'grayscale' | 'blur' | 'vignette' | 'sharpen'
@@ -47,6 +47,7 @@ export interface Effect {
 
 export interface AdjustmentLayer {
   id: string
+  trackId?: string
   startOnTimeline: number
   duration: number
   effects: Effect[]
@@ -62,6 +63,7 @@ export interface Transition {
 
 export interface TextOverlay {
   id: string
+  trackId?: string
   text: string
   startOnTimeline: number
   duration: number

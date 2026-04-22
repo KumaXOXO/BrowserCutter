@@ -57,11 +57,14 @@ export default function VideoPreview() {
     [tracks],
   )
 
-  const activeSeg = useMemo(() => segments.find(
-    (s) => videoTrackIdx.has(s.trackIndex) && !s.hidden &&
-      playheadPosition >= s.startOnTimeline &&
-      playheadPosition < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1),
-  ) ?? null, [segments, playheadPosition, videoTrackIdx])
+  const activeSeg = useMemo(() => {
+    const candidates = segments.filter(
+      (s) => videoTrackIdx.has(s.trackIndex) && !s.hidden &&
+        playheadPosition >= s.startOnTimeline &&
+        playheadPosition < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1),
+    )
+    return candidates.sort((a, b) => b.trackIndex - a.trackIndex)[0] ?? null
+  }, [segments, playheadPosition, videoTrackIdx])
   const activeClip = activeSeg ? clips.find((c) => c.id === activeSeg.clipId) ?? null : null
   activeSegRef.current = activeSeg
 

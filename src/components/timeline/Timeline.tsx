@@ -1,6 +1,6 @@
 // src/components/timeline/Timeline.tsx
 import { useState, useEffect } from 'react'
-import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2 } from 'lucide-react'
+import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors } from 'lucide-react'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
 import TextTrack from './TextTrack'
@@ -33,7 +33,18 @@ const ADD_OPTIONS: { type: TimelineTrack['type']; label: string }[] = [
 export default function Timeline({ height = 205, isDragging = false }: Props) {
   const [zoom, setZoom] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
-  const { playheadPosition, tracks, updateTrack, removeTrack, moveTrack } = useAppStore()
+  const { playheadPosition, tracks, updateTrack, removeTrack, moveTrack, timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled } = useAppStore()
+
+  // Shift+Mousewheel zoom
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (!e.shiftKey) return
+      e.preventDefault()
+      setZoom((z) => Math.min(5, Math.max(0.5, z - e.deltaY * 0.005)))
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [])
 
   // Global multi-select keyboard shortcuts
   useEffect(() => {
@@ -41,12 +52,16 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const { selectedSegmentIds, selectedElement, segments, setSelectedSegmentIds, removeSegments, setSelectedElement } = useAppStore.getState()
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSegmentIds.length > 0) {
-        e.preventDefault()
-        removeSegments(selectedSegmentIds)
-        setSelectedSegmentIds([])
-        setSelectedElement(null)
-        return
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const toDelete = new Set(selectedSegmentIds)
+        if (selectedElement?.type === 'segment') toDelete.add(selectedElement.id)
+        if (toDelete.size > 0) {
+          e.preventDefault()
+          removeSegments([...toDelete])
+          setSelectedSegmentIds([])
+          setSelectedElement(null)
+          return
+        }
       }
 
       // Shift+A: select all clips in the track of the current selection
@@ -143,12 +158,40 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
               ))}
             </div>
           )}
+          {/* Mode buttons */}
+          <div className="flex items-center gap-0.5 ml-1" style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 6 }}>
+            <ModeBtn active={timelineMode === 'playhead'} title="Playhead Mode — only move playhead" onClick={() => setTimelineMode('playhead')}>
+              <MousePointer2 size={10} />
+            </ModeBtn>
+            <ModeBtn active={timelineMode === 'selection'} title="Selection Mode — select & move clips" onClick={() => setTimelineMode('selection')}>
+              <Move size={10} />
+            </ModeBtn>
+          </div>
         </div>
-        <input
-          type="range" min={0.5} max={5} step={0.1} value={zoom}
-          onChange={(e) => setZoom(Number(e.target.value))}
-          style={{ width: 72, accentColor: '#E11D48', cursor: 'pointer' }}
-        />
+        <div className="flex items-center gap-2">
+          {/* Resize toggle — only active in selection mode */}
+          <button
+            title={resizeEnabled ? 'Resize ON — click to disable' : 'Resize OFF — click to enable (Selection mode only)'}
+            disabled={timelineMode !== 'selection'}
+            onClick={() => setResizeEnabled(!resizeEnabled)}
+            className="flex items-center gap-1 rounded text-xs cursor-pointer transition-all duration-150"
+            style={{
+              padding: '2px 6px',
+              border: `1px solid ${resizeEnabled ? 'rgba(225,29,72,0.6)' : 'var(--border-subtle)'}`,
+              background: resizeEnabled ? 'rgba(225,29,72,0.1)' : 'transparent',
+              color: timelineMode !== 'selection' ? 'var(--muted-subtle)' : resizeEnabled ? '#F43F5E' : 'var(--muted2)',
+              opacity: timelineMode !== 'selection' ? 0.4 : 1,
+              cursor: timelineMode !== 'selection' ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Scissors size={9} />
+          </button>
+          <input
+            type="range" min={0.5} max={5} step={0.1} value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            style={{ width: 72, accentColor: '#E11D48', cursor: 'pointer' }}
+          />
+        </div>
       </div>
 
       {/* Scrollable tracks */}
@@ -181,8 +224,8 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
                 onToggleMute={() => updateTrack(track.id, { muted: !track.muted })}
                 onDelete={() => removeTrack(track.id)}
               >
-                {track.type === 'subtitle' && <TextTrack zoom={zoom} trackLabelWidth={0} />}
-                {track.type === 'adjustment' && <AdjustmentTrack zoom={zoom} trackLabelWidth={0} />}
+                {track.type === 'subtitle' && <TextTrack zoom={zoom} trackLabelWidth={0} trackId={track.id} />}
+                {track.type === 'adjustment' && <AdjustmentTrack zoom={zoom} trackLabelWidth={0} trackId={track.id} />}
                 {(track.type === 'video' || track.type === 'audio') && (
                   <Track
                     trackIndex={track.trackIndex}
@@ -277,6 +320,24 @@ function Ctrl({ children, onClick, title, danger }: { children: React.ReactNode;
       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: danger ? 'rgba(255,80,80,0.8)' : 'rgba(255,255,255,0.5)', lineHeight: 1, borderRadius: 3 }}
       onMouseEnter={(e) => { e.currentTarget.style.color = danger ? '#EF4444' : 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
       onMouseLeave={(e) => { e.currentTarget.style.color = danger ? 'rgba(255,80,80,0.8)' : 'rgba(255,255,255,0.5)'; e.currentTarget.style.background = 'none' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ModeBtn({ children, active, title, onClick }: { children: React.ReactNode; active: boolean; title: string; onClick: () => void }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      style={{
+        background: active ? 'rgba(225,29,72,0.15)' : 'transparent',
+        border: `1px solid ${active ? 'rgba(225,29,72,0.5)' : 'var(--border-subtle)'}`,
+        color: active ? '#F43F5E' : 'var(--muted2)',
+        cursor: 'pointer', padding: '2px 5px', borderRadius: 4, lineHeight: 1,
+        transition: 'all 120ms',
+      }}
     >
       {children}
     </button>

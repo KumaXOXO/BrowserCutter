@@ -10,7 +10,7 @@ export default function PlaybackControls() {
   const totalDuration = segments
     .reduce((max, s) => Math.max(max, s.startOnTimeline + (s.outPoint - s.inPoint)), 0)
 
-  const progress = totalDuration > 0 ? (playheadPosition / totalDuration) * 100 : 0
+  const progress = totalDuration > 0 ? Math.min(100, (playheadPosition / totalDuration) * 100) : 0
 
   const handleUndo = () => { setIsPlaying(false); undo() }
   const handleRedo = () => { setIsPlaying(false); redo() }

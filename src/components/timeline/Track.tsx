@@ -59,12 +59,14 @@ export default function Track({ trackIndex, trackType, label, icon, height, zoom
       className="flex items-center"
       style={{ height, borderBottom: '1px solid rgba(255,255,255,0.03)' }}
     >
-      <div
-        className="flex items-center gap-1 px-2 shrink-0"
-        style={{ minWidth: trackLabelWidth, width: trackLabelWidth, fontSize: 10, color: 'var(--muted-subtle)' }}
-      >
-        {icon} {label}
-      </div>
+      {trackLabelWidth > 0 && (
+        <div
+          className="flex items-center gap-1 px-2 shrink-0"
+          style={{ minWidth: trackLabelWidth, width: trackLabelWidth, fontSize: 10, color: 'var(--muted-subtle)' }}
+        >
+          {icon} {label}
+        </div>
+      )}
       <div
         className="relative h-full"
         style={{ width: totalWidth }}

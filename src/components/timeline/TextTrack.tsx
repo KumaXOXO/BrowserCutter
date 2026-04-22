@@ -6,15 +6,20 @@ import { PX_PER_SEC } from './ClipBlock'
 interface Props {
   zoom: number
   trackLabelWidth: number
+  trackId?: string
 }
 
-export default function TextTrack({ zoom, trackLabelWidth }: Props) {
+export default function TextTrack({ zoom, trackLabelWidth, trackId }: Props) {
   const { textOverlays, selectedElement, setSelectedElement } = useAppStore()
   const px = PX_PER_SEC * zoom
 
+  const visibleOverlays = textOverlays.filter((o) =>
+    trackId ? (o.trackId ?? 'text') === trackId : !o.trackId,
+  )
+
   const totalWidth = Math.max(
     700,
-    textOverlays.reduce((max, o) => Math.max(max, (o.startOnTimeline + o.duration) * px), 0) + 300,
+    visibleOverlays.reduce((max, o) => Math.max(max, (o.startOnTimeline + o.duration) * px), 0) + 300,
   )
 
   return (
@@ -22,14 +27,16 @@ export default function TextTrack({ zoom, trackLabelWidth }: Props) {
       className="flex items-center"
       style={{ height: 26, borderBottom: '1px solid rgba(255,255,255,0.03)' }}
     >
-      <div
-        className="flex items-center gap-1 px-2 shrink-0"
-        style={{ minWidth: trackLabelWidth, width: trackLabelWidth, fontSize: 10, color: 'var(--muted-subtle)' }}
-      >
-        <Type size={9} /> Text
-      </div>
+      {trackLabelWidth > 0 && (
+        <div
+          className="flex items-center gap-1 px-2 shrink-0"
+          style={{ minWidth: trackLabelWidth, width: trackLabelWidth, fontSize: 10, color: 'var(--muted-subtle)' }}
+        >
+          <Type size={9} /> Text
+        </div>
+      )}
       <div className="relative h-full" style={{ width: totalWidth }}>
-        {textOverlays.map((overlay) => {
+        {visibleOverlays.map((overlay) => {
           const left = overlay.startOnTimeline * px
           const width = Math.max(4, overlay.duration * px)
           const isSelected = selectedElement?.id === overlay.id

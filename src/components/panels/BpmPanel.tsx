@@ -2,22 +2,24 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { PanelLabel } from './TextPanel'
-import type { BpmMode, SegmentLength } from '../../types'
+import type { BpmMode } from '../../types'
 import { detectBpm } from '../../lib/audio/bpmDetector'
 import { generateCut } from '../../lib/bpm/generateCut'
 
-const MODES: { id: BpmMode; label: string; example: string }[] = [
-  { id: 'sequential', label: 'Sequential', example: 'A→B→C→A→B→C' },
-  { id: 'random',     label: 'Random',     example: 'ACBBA...'      },
-  { id: 'forfeit',    label: 'Forfeit',     example: 'AB→BC→CD'     },
+const MODES: { id: BpmMode; label: string }[] = [
+  { id: 'normal',     label: 'Normal'     },
+  { id: 'sequential', label: 'Sequential' },
+  { id: 'random',     label: 'Random'     },
+  { id: 'forfeit',    label: 'Forfeit'    },
 ]
 
-const SEGMENT_LENGTHS: { value: SegmentLength; label: string }[] = [
-  { value: 0.5, label: '½ Beat' },
-  { value: 1,   label: '1 Beat' },
-  { value: 2,   label: '2 Beats' },
-  { value: 4,   label: '4 Beats' },
-]
+// Musical segment length steps: 1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32
+const SEG_STEPS = [1/32, 1/16, 1/8, 1/4, 0.5, 1, 2, 4, 8, 16, 32]
+
+function segStepLabel(v: number): string {
+  if (v < 1) return `1/${Math.round(1 / v)}`
+  return `${v}`
+}
 
 export default function BpmPanel() {
   const { bpmConfig, clips, tracks, segments, updateBpmConfig, addSegments, replaceSegments, setPlayheadPosition, setIsPlaying } = useAppStore()
@@ -32,6 +34,9 @@ export default function BpmPanel() {
   const videoTracks = tracks.filter((t) => t.type === 'video')
   const [selectedTrackId, setSelectedTrackId] = useState<string>(() => videoTracks[0]?.id ?? 'v1')
   const selectedTrack = videoTracks.find((t) => t.id === selectedTrackId) ?? videoTracks[0]
+
+  const segStepIndex = SEG_STEPS.findIndex((v) => Math.abs(v - bpmConfig.segmentLength) < 0.001)
+  const currentStepIndex = segStepIndex >= 0 ? segStepIndex : 5
 
   return (
     <div className="flex flex-col gap-4 p-3.5 overflow-y-auto h-full">
@@ -117,67 +122,56 @@ export default function BpmPanel() {
         </div>
       </div>
 
-      {/* Mode */}
+      {/* Mode — dropdown */}
       <div>
         <PanelLabel>Cutting Mode</PanelLabel>
-        <div className="flex flex-col gap-1.5 mt-2">
-          {MODES.map((m) => {
-            const selected = bpmConfig.mode === m.id
-            return (
-              <button
-                key={m.id}
-                onClick={() => updateBpmConfig({ mode: m.id })}
-                className="flex items-start gap-2.5 rounded-lg p-2.5 cursor-pointer text-left transition-all duration-150"
-                style={{
-                  border: `1px solid ${selected ? 'rgba(225,29,72,0.5)' : 'var(--border-subtle)'}`,
-                  background: selected ? 'rgba(225,29,72,0.06)' : 'var(--surface2)',
-                  boxShadow: selected ? '0 0 0 1px rgba(225,29,72,0.15)' : 'none',
-                }}
-              >
-                <input type="radio" name="bpm-mode" readOnly checked={selected} style={{ accentColor: '#E11D48', marginTop: 2 }} />
-                <div>
-                  <p className="text-xs font-medium">{m.label}</p>
-                  <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--muted-subtle)' }}>{m.example}</p>
-                </div>
-              </button>
-            )
-          })}
+        <select
+          className="inp mt-1.5"
+          value={bpmConfig.mode}
+          onChange={(e) => updateBpmConfig({ mode: e.target.value as BpmMode })}
+        >
+          {MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+      </div>
+
+      {/* Segment length — slider */}
+      <div>
+        <PanelLabel>Segment Length — {segStepLabel(SEG_STEPS[currentStepIndex])} beat{SEG_STEPS[currentStepIndex] !== 1 ? 's' : ''}</PanelLabel>
+        <input
+          type="range"
+          className="mt-1.5"
+          min={0} max={SEG_STEPS.length - 1} step={1}
+          value={currentStepIndex}
+          style={{ width: '100%', accentColor: '#E11D48', cursor: 'pointer' }}
+          onChange={(e) => updateBpmConfig({ segmentLength: SEG_STEPS[Number(e.target.value)] })}
+        />
+        <div className="flex justify-between text-xs mt-0.5" style={{ color: 'var(--muted-subtle)', fontSize: 9 }}>
+          <span>1/32</span><span>1</span><span>32</span>
         </div>
       </div>
 
-      {/* Segment length + output */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <div>
-          <PanelLabel>Segment</PanelLabel>
+      {/* Output */}
+      <div>
+        <PanelLabel>Output Duration</PanelLabel>
+        <div className="flex gap-1 mt-1.5">
+          <input
+            type="number"
+            className="inp"
+            style={{ width: 72 }}
+            value={bpmConfig.outputDuration}
+            min={0.1}
+            step={0.1}
+            onChange={(e) => updateBpmConfig({ outputDuration: Number(e.target.value) })}
+          />
           <select
-            className="inp mt-1.5"
-            value={bpmConfig.segmentLength}
-            onChange={(e) => updateBpmConfig({ segmentLength: Number(e.target.value) as SegmentLength })}
+            className="inp"
+            style={{ paddingLeft: 6, paddingRight: 6 }}
+            value={bpmConfig.outputUnit}
+            onChange={(e) => updateBpmConfig({ outputUnit: e.target.value as 'seconds' | 'beats' })}
           >
-            {SEGMENT_LENGTHS.map((sl) => <option key={sl.value} value={sl.value}>{sl.label}</option>)}
+            <option value="seconds">sec</option>
+            <option value="beats">beats</option>
           </select>
-        </div>
-        <div>
-          <PanelLabel>Output</PanelLabel>
-          <div className="flex gap-1 mt-1.5">
-            <input
-              type="number"
-              className="inp"
-              style={{ width: 52 }}
-              value={bpmConfig.outputDuration}
-              min={1}
-              onChange={(e) => updateBpmConfig({ outputDuration: Number(e.target.value) })}
-            />
-            <select
-              className="inp"
-              style={{ paddingLeft: 6, paddingRight: 6 }}
-              value={bpmConfig.outputUnit}
-              onChange={(e) => updateBpmConfig({ outputUnit: e.target.value as 'seconds' | 'beats' })}
-            >
-              <option value="seconds">sec</option>
-              <option value="beats">beats</option>
-            </select>
-          </div>
         </div>
       </div>
 

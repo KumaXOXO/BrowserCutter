@@ -116,11 +116,13 @@ export function startVideoTick(params: VideoTickParams): void {
     const vIdx = videoIndices(tracksRef.current)
     const aIdx = audioIndices(tracksRef.current)
     if (rawTime < seg.inPoint) {
-      stallCountRef.current += 1
-      if (stallCountRef.current > 60) {
-        stallCountRef.current = 0
-        setIsPlaying(false)
-        return
+      if (!videoRef.current?.paused) {
+        stallCountRef.current += 1
+        if (stallCountRef.current > 60) {
+          stallCountRef.current = 0
+          setIsPlaying(false)
+          return
+        }
       }
       rafRef.current = requestAnimationFrame(tick)
       return

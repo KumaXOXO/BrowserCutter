@@ -95,6 +95,12 @@ interface AppState {
   setLoopRegion: (region: { start: number; end: number } | null) => void
   loadProject: (data: Record<string, unknown>) => void
 
+  // ─── Timeline mode ───
+  timelineMode: 'playhead' | 'selection'
+  resizeEnabled: boolean
+  setTimelineMode: (mode: 'playhead' | 'selection') => void
+  setResizeEnabled: (enabled: boolean) => void
+
   undo: () => void
   redo: () => void
   canUndo: () => boolean
@@ -169,7 +175,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     selectedClipIds: [],
   },
 
+  // ─── Timeline mode ───
+  timelineMode: 'selection',
+  resizeEnabled: false,
+
   // ─── Actions ───
+  setTimelineMode: (mode) => set({ timelineMode: mode, resizeEnabled: mode === 'playhead' ? false : get().resizeEnabled }),
+  setResizeEnabled: (enabled) => set((s) => ({ resizeEnabled: s.timelineMode === 'selection' ? enabled : false })),
+
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMediaSubTab: (tab) => set({ mediaSubTab: tab }),
   setSelectedElement: (el) => set({ selectedElement: el, activeTab: el ? 'inspector' : 'media', selectedSegmentIds: [] }),

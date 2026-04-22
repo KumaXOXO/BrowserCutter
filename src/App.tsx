@@ -20,9 +20,12 @@ const MAX_LEFT_WIDTH = 400
 const DEFAULT_LEFT_WIDTH = 284
 
 export default function App() {
-  const { projectSettings, activeTab } = useAppStore()
+  const { projectSettings, activeTab, clips, segments } = useAppStore()
   const fullWidth = projectSettings.fullWidthTimeline ?? true
   const showRightPanel = activeTab === 'effects'
+
+  const usedClipIds = new Set(segments.map((s) => s.clipId))
+  const missingFileCount = clips.filter((c) => usedClipIds.has(c.id) && !c.file).length
 
   const [timelineHeight, setTimelineHeight] = useState(
     () => Math.min(MAX_TIMELINE_HEIGHT, Math.max(MIN_TIMELINE_HEIGHT, Number(localStorage.getItem('bc:timeline:height')) || DEFAULT_TIMELINE_HEIGHT)),
@@ -94,6 +97,12 @@ export default function App() {
     return (
       <div className="flex flex-col" style={{ height: '100vh' }}>
         <TopBar />
+        {missingFileCount > 0 && (
+          <div className="flex items-center justify-center gap-2 shrink-0 text-xs" style={{ background: 'rgba(234,179,8,0.12)', borderBottom: '1px solid rgba(234,179,8,0.3)', padding: '5px 12px', color: '#FDE68A' }}>
+            <span style={{ fontWeight: 600 }}>⚠ {missingFileCount} clip{missingFileCount > 1 ? 's' : ''} need re-importing.</span>
+            <span style={{ color: 'rgba(253,230,138,0.7)' }}>Re-upload the original files in the Media tab to restore playback and export.</span>
+          </div>
+        )}
         <div className="flex overflow-hidden" style={{ flex: '1 1 0', minHeight: 0 }}>
           <IconSidebar />
           <LeftPanel {...leftPanelProps} />
@@ -112,6 +121,12 @@ export default function App() {
   return (
     <div className="flex flex-col" style={{ height: '100vh' }}>
       <TopBar />
+      {missingFileCount > 0 && (
+        <div className="flex items-center justify-center gap-2 shrink-0 text-xs" style={{ background: 'rgba(234,179,8,0.12)', borderBottom: '1px solid rgba(234,179,8,0.3)', padding: '5px 12px', color: '#FDE68A' }}>
+          <span style={{ fontWeight: 600 }}>⚠ {missingFileCount} clip{missingFileCount > 1 ? 's' : ''} need re-importing.</span>
+          <span style={{ color: 'rgba(253,230,138,0.7)' }}>Re-upload the original files in the Media tab to restore playback and export.</span>
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         <IconSidebar />
         <LeftPanel {...leftPanelProps} />
