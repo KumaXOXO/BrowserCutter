@@ -27,7 +27,7 @@ const TRANSITION_SYMBOLS: Record<string, string> = {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, removeSegment, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips, timelineMode, resizeEnabled } = useAppStore()
+  const { selectedElement, setSelectedElement, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips, timelineMode, resizeEnabled } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
   const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
@@ -51,12 +51,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (selectedElement?.type !== 'segment') return
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault()
-        if (selectedSegmentIds.length > 0) return // let global handler in Timeline take over
-        setSelectedElement(null)
-        removeSegment(segment.id)
-      } else if (e.key === 'h' || e.key === 'H') {
+      if (e.key === 'h' || e.key === 'H') {
         e.preventDefault()
         updateSegment(segment.id, { hidden: !segRef.current.hidden })
       } else if (e.key === 'm' || e.key === 'M') {
