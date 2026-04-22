@@ -18,7 +18,7 @@ export default function VideoGrid({ clips }: { clips: Clip[] }) {
 
 function VideoThumb({ clip }: { clip: Clip }) {
   const [hovered, setHovered] = useState(false)
-  const { segments, addSegment } = useAppStore()
+  const { segments, addSegment, setPlayheadPosition } = useAppStore()
 
   const handleAddToTimeline = () => {
     const trackIndex = clip.type === 'audio' ? 2 : 0
@@ -33,6 +33,7 @@ function VideoThumb({ clip }: { clip: Clip }) {
       inPoint: 0,
       outPoint: clip.duration,
     })
+    setPlayheadPosition(endOfTrack)
   }
 
   return (

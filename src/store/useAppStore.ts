@@ -67,6 +67,7 @@ interface AppState {
 
   addClip: (clip: Clip) => void
   removeClip: (id: ClipId) => void
+  updateClip: (id: ClipId, patch: Partial<Clip>) => void
 
   addSegment: (segment: Segment) => void
   removeSegment: (id: SegmentId) => void
@@ -74,6 +75,7 @@ interface AppState {
   updateSegment: (id: SegmentId, patch: Partial<Segment>) => void
   addSegments: (segments: Segment[]) => void
   replaceSegments: (segments: Segment[], targetTrackIndex?: number) => void
+  splitSegment: (id: SegmentId, splitAt: number) => void
 
   addTextOverlay: (overlay: TextOverlay) => void
   updateTextOverlay: (id: string, patch: Partial<TextOverlay>) => void
@@ -96,9 +98,9 @@ interface AppState {
   loadProject: (data: Record<string, unknown>) => void
 
   // ─── Timeline mode ───
-  timelineMode: 'playhead' | 'selection'
+  timelineMode: 'playhead' | 'selection' | 'cut'
   resizeEnabled: boolean
-  setTimelineMode: (mode: 'playhead' | 'selection') => void
+  setTimelineMode: (mode: 'playhead' | 'selection' | 'cut') => void
   setResizeEnabled: (enabled: boolean) => void
 
   undo: () => void
@@ -140,11 +142,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ─── Tracks ───
   tracks: [
+    { id: 'adj', name: 'Adjustment', type: 'adjustment', trackIndex: -1 },
     { id: 'v1', name: 'V1', type: 'video', trackIndex: 0 },
     { id: 'v2', name: 'V2', type: 'video', trackIndex: 3 },
     { id: 'v3', name: 'V3', type: 'video', trackIndex: 4 },
     { id: 'text', name: 'Text', type: 'subtitle', trackIndex: 1 },
-    { id: 'adj', name: 'Adjustment', type: 'adjustment', trackIndex: -1 },
     { id: 'audio', name: 'Audio', type: 'audio', trackIndex: 2 },
   ] as TimelineTrack[],
 
@@ -167,7 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ─── BPM tool ───
   bpmConfig: {
-    bpm: 128,
+    bpm: 120,
     mode: 'random',
     segmentLength: 1,
     outputDuration: 30,
@@ -180,7 +182,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   resizeEnabled: false,
 
   // ─── Actions ───
-  setTimelineMode: (mode) => set({ timelineMode: mode, resizeEnabled: mode === 'playhead' ? false : get().resizeEnabled }),
+  setTimelineMode: (mode) => set({ timelineMode: mode, resizeEnabled: (mode === 'playhead' || mode === 'cut') ? false : get().resizeEnabled }),
   setResizeEnabled: (enabled) => set((s) => ({ resizeEnabled: s.timelineMode === 'selection' ? enabled : false })),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -211,6 +213,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addClip: (clip) => set((s) => ({ clips: [...s.clips, clip] })),
   removeClip: (id) => set((s) => ({ clips: s.clips.filter((c) => c.id !== id) })),
+  updateClip: (id, patch) => set((s) => ({ clips: s.clips.map((c) => c.id === id ? { ...c, ...patch } : c) })),
 
   addSegment: (segment) => set((s) => ({ ...push(s), segments: [...s.segments, segment] })),
   removeSegment: (id) => set((s) => ({ ...push(s), segments: s.segments.filter((seg) => seg.id !== id) })),
@@ -229,6 +232,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...push(s), segments, playheadPosition }
     }),
   addSegments: (newSegs) => set((s) => ({ ...push(s), segments: [...s.segments, ...newSegs] })),
+  splitSegment: (id, splitAt) => set((s) => {
+    const seg = s.segments.find((x) => x.id === id)
+    if (!seg) return s
+    const speed = Math.max(0.01, seg.speed ?? 1)
+    const dur = (seg.outPoint - seg.inPoint) / speed
+    if (splitAt <= seg.startOnTimeline || splitAt >= seg.startOnTimeline + dur) return s
+    const splitInPoint = seg.inPoint + (splitAt - seg.startOnTimeline) * speed
+    const updated = s.segments.map((x) => x.id === id ? { ...x, outPoint: splitInPoint } : x)
+    const newSeg: Segment = { ...seg, id: crypto.randomUUID(), inPoint: splitInPoint, startOnTimeline: splitAt }
+    return { ...push(s), segments: [...updated, newSeg] }
+  }),
   replaceSegments: (newSegs, targetTrackIndex = 0) =>
     set((s) => ({ ...push(s), segments: [...s.segments.filter((seg) => seg.trackIndex !== targetTrackIndex), ...newSegs] })),
 

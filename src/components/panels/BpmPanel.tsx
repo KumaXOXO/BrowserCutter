@@ -25,12 +25,23 @@ export default function BpmPanel() {
   const { bpmConfig, clips, tracks, segments, updateBpmConfig, addSegments, replaceSegments, setPlayheadPosition, setIsPlaying } = useAppStore()
   const [detecting, setDetecting] = useState(false)
   const [appendMode, setAppendMode] = useState(true)
+  const [cutToast, setCutToast] = useState<number | null>(null)
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
   const videoClips = clips.filter((c) => c.type === 'video')
+
+  // Auto-select newly uploaded clips
+  const prevClipCountRef = useRef(videoClips.length)
+  useEffect(() => {
+    if (videoClips.length > prevClipCountRef.current) {
+      const newIds = videoClips.slice(prevClipCountRef.current).map((c) => c.id)
+      updateBpmConfig({ selectedClipIds: [...bpmConfig.selectedClipIds, ...newIds] })
+    }
+    prevClipCountRef.current = videoClips.length
+  }, [videoClips.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const videoTracks = tracks.filter((t) => t.type === 'video')
   const [selectedTrackId, setSelectedTrackId] = useState<string>(() => videoTracks[0]?.id ?? 'v1')
   const selectedTrack = videoTracks.find((t) => t.id === selectedTrackId) ?? videoTracks[0]
@@ -223,11 +234,22 @@ export default function BpmPanel() {
             }
             setIsPlaying(false)
             if (!appendMode) setPlayheadPosition(0)
+            setCutToast(newSegments.length)
+            setTimeout(() => setCutToast(null), 3000)
           }
         }}
       >
         {appendMode ? 'Append Cut' : 'Replace Cut'}
       </button>
+
+      {cutToast !== null && (
+        <div style={{
+          background: 'rgba(225,29,72,0.15)', border: '1px solid rgba(225,29,72,0.3)',
+          borderRadius: 8, padding: '6px 12px', fontSize: 11, color: '#F43F5E', textAlign: 'center',
+        }}>
+          {cutToast} clip{cutToast !== 1 ? 's' : ''} created
+        </div>
+      )}
     </div>
   )
 }

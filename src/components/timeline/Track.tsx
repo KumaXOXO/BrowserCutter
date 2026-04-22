@@ -1,4 +1,5 @@
 // src/components/timeline/Track.tsx
+import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import ClipBlock, { PX_PER_SEC } from './ClipBlock'
 
@@ -13,7 +14,16 @@ interface Props {
 }
 
 export default function Track({ trackIndex, trackType, label, icon, height, zoom, trackLabelWidth }: Props) {
-  const { segments, clips, addSegment } = useAppStore()
+  const { segments, clips, addSegment, timelineMode, setPlayheadPosition, setSelectedElement, setSelectedSegmentIds } = useAppStore()
+  const [dragTarget, setDragTarget] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setDragTarget((e as CustomEvent<number | null>).detail === trackIndex)
+    }
+    document.addEventListener('bc:drag-track', handler)
+    return () => document.removeEventListener('bc:drag-track', handler)
+  }, [trackIndex])
   const trackSegments = segments.filter((s) => s.trackIndex === trackIndex)
 
   const totalWidth = Math.max(
@@ -69,11 +79,20 @@ export default function Track({ trackIndex, trackType, label, icon, height, zoom
       )}
       <div
         className="relative h-full"
-        style={{ width: totalWidth }}
+        style={{ width: totalWidth, background: dragTarget ? 'rgba(225,29,72,0.12)' : undefined, transition: 'background 80ms' }}
         data-track-index={trackIndex}
         data-track-type={trackType}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onMouseDown={(e) => {
+          if (timelineMode === 'playhead') {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setPlayheadPosition(Math.max(0, (e.clientX - rect.left) / (PX_PER_SEC * zoom)))
+          } else if (timelineMode === 'selection' && e.target === e.currentTarget) {
+            setSelectedElement(null)
+            setSelectedSegmentIds([])
+          }
+        }}
       >
         {trackSegments.map((seg) => {
           const clip = clips.find((c) => c.id === seg.clipId)

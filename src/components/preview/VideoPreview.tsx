@@ -63,10 +63,16 @@ export default function VideoPreview() {
         playheadPosition >= s.startOnTimeline &&
         playheadPosition < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1),
     )
-    return candidates.sort((a, b) => b.trackIndex - a.trackIndex)[0] ?? null
-  }, [segments, playheadPosition, videoTrackIdx])
+    // Sort by track array position: lower index (top of UI stack) wins
+    return candidates.sort((a, b) => {
+      const aPos = tracks.findIndex((t) => t.trackIndex === a.trackIndex)
+      const bPos = tracks.findIndex((t) => t.trackIndex === b.trackIndex)
+      return aPos - bPos
+    })[0] ?? null
+  }, [segments, playheadPosition, videoTrackIdx, tracks])
   const activeClip = activeSeg ? clips.find((c) => c.id === activeSeg.clipId) ?? null : null
-  activeSegRef.current = activeSeg
+  // Only update ref while paused — RAF tick owns this ref during playback to avoid overwrite race
+  if (!isPlaying) activeSegRef.current = activeSeg
 
   const activeAudioSeg = useMemo(() => segments.find(
     (s) => audioTrackIdx.has(s.trackIndex) && !s.muted &&
@@ -74,7 +80,7 @@ export default function VideoPreview() {
       playheadPosition < s.startOnTimeline + (s.outPoint - s.inPoint),
   ) ?? null, [segments, playheadPosition, audioTrackIdx])
   const activeAudioClip = activeAudioSeg ? clips.find((c) => c.id === activeAudioSeg.clipId) ?? null : null
-  activeAudioSegRef.current = activeAudioSeg
+  if (!isPlaying) activeAudioSegRef.current = activeAudioSeg
 
   const isImageClip = activeClip?.type === 'image'
 

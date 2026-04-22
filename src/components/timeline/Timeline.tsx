@@ -1,6 +1,6 @@
 // src/components/timeline/Timeline.tsx
-import { useState, useEffect } from 'react'
-import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight } from 'lucide-react'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
 import TextTrack from './TextTrack'
@@ -33,7 +33,19 @@ const ADD_OPTIONS: { type: TimelineTrack['type']; label: string }[] = [
 export default function Timeline({ height = 205, isDragging = false }: Props) {
   const [zoom, setZoom] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
-  const { playheadPosition, tracks, updateTrack, removeTrack, moveTrack, timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled, projectSettings, updateProjectSettings } = useAppStore()
+  const [playheadHovered, setPlayheadHovered] = useState(false)
+  const [playheadDragging, setPlayheadDragging] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const zoomRef = useRef(zoom)
+  useEffect(() => { zoomRef.current = zoom }, [zoom])
+
+  const {
+    playheadPosition, setPlayheadPosition, setIsPlaying,
+    tracks, updateTrack, removeTrack, moveTrack,
+    timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled,
+    projectSettings, updateProjectSettings,
+    bpmConfig, updateBpmConfig,
+  } = useAppStore()
 
   // Shift+Mousewheel zoom
   useEffect(() => {
@@ -46,11 +58,12 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
     return () => window.removeEventListener('wheel', onWheel)
   }, [])
 
-  // Global multi-select keyboard shortcuts
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      const { selectedSegmentIds, selectedElement, segments, setSelectedSegmentIds, removeSegments, setSelectedElement } = useAppStore.getState()
+      const store = useAppStore.getState()
+      const { selectedSegmentIds, selectedElement, segments, setSelectedSegmentIds, setSelectedElement, removeSegments } = store
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const toDelete = new Set(selectedSegmentIds)
@@ -64,14 +77,20 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         }
       }
 
+      // Ctrl+A: select all segments in all tracks
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'a') {
+        e.preventDefault()
+        setSelectedSegmentIds(segments.map((s) => s.id))
+        return
+      }
+
       // Shift+A: select all clips in the track of the current selection
       if (e.shiftKey && !e.ctrlKey && !e.metaKey && e.key === 'A') {
         e.preventDefault()
         const anchorId = selectedElement?.id ?? selectedSegmentIds[selectedSegmentIds.length - 1]
         const anchor = segments.find((s) => s.id === anchorId)
         if (anchor) {
-          const trackSegs = segments.filter((s) => s.trackIndex === anchor.trackIndex)
-          setSelectedSegmentIds(trackSegs.map((s) => s.id))
+          setSelectedSegmentIds(segments.filter((s) => s.trackIndex === anchor.trackIndex).map((s) => s.id))
         }
         return
       }
@@ -79,17 +98,56 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       // Ctrl+Shift+A: select all clips in all video tracks
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
         e.preventDefault()
-        const { tracks: allTracks } = useAppStore.getState()
-        const videoTrackIndices = new Set(allTracks.filter((t) => t.type === 'video').map((t) => t.trackIndex))
-        const videoSegs = segments.filter((s) => videoTrackIndices.has(s.trackIndex))
-        setSelectedSegmentIds(videoSegs.map((s) => s.id))
+        const { tracks: allTracks } = store
+        const videoIdx = new Set(allTracks.filter((t) => t.type === 'video').map((t) => t.trackIndex))
+        setSelectedSegmentIds(segments.filter((s) => videoIdx.has(s.trackIndex)).map((s) => s.id))
+        return
+      }
+
+      // Frame step: . = forward, , = back
+      if (e.key === '.' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault()
+        const { playheadPosition: pos, isPlaying, setPlayheadPosition: setPos, setIsPlaying: setPlay, projectSettings: ps } = store
+        if (isPlaying) setPlay(false)
+        setPos(Math.max(0, pos + 1 / Math.max(1, ps.fps)))
+        return
+      }
+      if (e.key === ',' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault()
+        const { playheadPosition: pos, isPlaying, setPlayheadPosition: setPos, setIsPlaying: setPlay, projectSettings: ps } = store
+        if (isPlaying) setPlay(false)
+        setPos(Math.max(0, pos - 1 / Math.max(1, ps.fps)))
         return
       }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [])
+
   const playheadLeft = TRACK_LABEL_WIDTH + playheadPosition * PX_PER_SEC * zoom
+
+  function handlePlayheadMouseDown(e: React.MouseEvent) {
+    if (timelineMode !== 'playhead') return
+    e.stopPropagation()
+    e.preventDefault()
+    setPlayheadDragging(true)
+    const scrollEl = scrollRef.current
+    const containerRect = scrollEl?.getBoundingClientRect()
+
+    const onMove = (ev: MouseEvent) => {
+      const scrollLeft = scrollEl?.scrollLeft ?? 0
+      const left = containerRect?.left ?? 0
+      const x = ev.clientX - left + scrollLeft - TRACK_LABEL_WIDTH
+      setPlayheadPosition(Math.max(0, x / (PX_PER_SEC * zoomRef.current)))
+    }
+    const onUp = () => {
+      setPlayheadDragging(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   function handleAddTrack(type: TimelineTrack['type']) {
     const posIndices = tracks.map((t) => t.trackIndex).filter((i) => i >= 0)
@@ -107,20 +165,27 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       type,
       trackIndex: type === 'adjustment' || type === 'subtitle' ? -(nextIndex) : nextIndex,
     }
-    // Insert after the last track of the same type
     const lastSameTypeIdx = tracks.reduce((best, t, i) => t.type === type ? i : best, -1)
-    const insertAfter = lastSameTypeIdx >= 0 ? lastSameTypeIdx : tracks.length - 1
-    // addTrack appends; we reorder immediately via a custom insert
+    let insertAfter: number
+    if (lastSameTypeIdx >= 0) {
+      insertAfter = lastSameTypeIdx
+    } else if (type === 'adjustment') {
+      insertAfter = -1  // top of list
+    } else {
+      insertAfter = tracks.length - 1
+    }
     const newTracks = [...tracks]
     newTracks.splice(insertAfter + 1, 0, newTrack)
     useAppStore.setState({ tracks: newTracks })
     setShowAddModal(false)
   }
 
+  const enlarged = timelineMode === 'playhead' && (playheadHovered || playheadDragging)
+
   return (
     <div
       className="flex flex-col shrink-0 relative"
-      style={{ height, background: 'var(--bg)', borderTop: '1px solid var(--border-subtle)', transition: isDragging ? 'none' : 'height 0.15s ease' }}
+      style={{ height, background: 'var(--bg)', borderTop: '1px solid var(--border-subtle)', transition: isDragging ? 'none' : 'height 0.15s ease', userSelect: 'none' }}
     >
       {/* Toolbar */}
       <div
@@ -142,6 +207,28 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
           >
             {projectSettings.snapToBeat ? 'GRID' : 'FREE'}
           </button>
+
+          {/* BPM input */}
+          <input
+            type="number"
+            title="BPM for grid snapping"
+            min={20} max={300}
+            value={bpmConfig.bpm ?? ''}
+            placeholder="–"
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              if (v >= 20 && v <= 300) updateBpmConfig({ bpm: v })
+            }}
+            style={{
+              width: 52, fontSize: 10, textAlign: 'center',
+              background: 'transparent', border: '1px solid var(--border-subtle)',
+              color: 'var(--muted2)', borderRadius: 4, padding: '2px 4px',
+              outline: 'none',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(225,29,72,0.5)'; e.currentTarget.style.color = 'var(--text)' }}
+            onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--muted2)' }}
+          />
+
           <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--muted-subtle)', fontSize: 10 }}>Timeline</span>
           <button
             className="text-xs rounded cursor-pointer transition-all duration-150"
@@ -174,11 +261,14 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
           )}
           {/* Mode buttons */}
           <div className="flex items-center gap-0.5 ml-1" style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 6 }}>
-            <ModeBtn active={timelineMode === 'playhead'} title="Playhead Mode — only move playhead" onClick={() => setTimelineMode('playhead')}>
+            <ModeBtn active={timelineMode === 'playhead'} title="Playhead Mode — click empty area or drag playhead" onClick={() => setTimelineMode('playhead')}>
               <MousePointer2 size={10} />
             </ModeBtn>
             <ModeBtn active={timelineMode === 'selection'} title="Selection Mode — select & move clips" onClick={() => setTimelineMode('selection')}>
               <Move size={10} />
+            </ModeBtn>
+            <ModeBtn active={timelineMode === 'cut'} title="Cut Mode — click a clip to split at playhead" onClick={() => setTimelineMode('cut')}>
+              <Scissors size={10} />
             </ModeBtn>
           </div>
         </div>
@@ -198,7 +288,7 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
               cursor: timelineMode !== 'selection' ? 'not-allowed' : 'pointer',
             }}
           >
-            <Scissors size={9} />
+            <ArrowLeftRight size={9} />
           </button>
           <input
             type="range" min={0.5} max={5} step={0.1} value={zoom}
@@ -209,14 +299,30 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       </div>
 
       {/* Scrollable tracks */}
-      <div className="flex-1 overflow-auto relative">
+      <div ref={scrollRef} className="flex-1 overflow-auto relative">
         <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} zoom={zoom} />
         <div style={{ position: 'relative' }}>
           {/* Playhead line */}
           <div
             style={{ position: 'absolute', top: 0, bottom: 0, left: playheadLeft, width: 1.5, background: '#E11D48', zIndex: 20, pointerEvents: 'none' }}
           >
-            <div style={{ position: 'absolute', top: -2, left: -5, width: 12, height: 8, background: '#E11D48', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', borderRadius: 2 }} />
+            <div
+              onMouseDown={handlePlayheadMouseDown}
+              onMouseEnter={() => setPlayheadHovered(true)}
+              onMouseLeave={() => setPlayheadHovered(false)}
+              style={{
+                position: 'absolute',
+                top: -2, left: enlarged ? -7 : -5,
+                width: enlarged ? 16 : 12,
+                height: enlarged ? 10 : 8,
+                background: '#E11D48',
+                clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+                borderRadius: 2,
+                transition: 'all 100ms',
+                cursor: timelineMode === 'playhead' ? 'col-resize' : 'default',
+                pointerEvents: 'auto',
+              }}
+            />
           </div>
 
           {tracks.map((track, idx) => {

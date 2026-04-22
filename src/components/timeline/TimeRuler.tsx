@@ -12,21 +12,29 @@ export default function TimeRuler({
   trackLabelWidth: number
   zoom: number
 }) {
-  const { setPlayheadPosition, setIsPlaying, loopRegion, setLoopRegion, segments } = useAppStore()
+  const { setPlayheadPosition, setIsPlaying, loopRegion, setLoopRegion, segments, bpmConfig } = useAppStore()
   const px = PX_PER_SEC * zoom
   const markWidth = px * INTERVAL_SEC
 
+  const totalDur = useMemo(() =>
+    Math.max(60, segments.reduce((max, s) =>
+      Math.max(max, s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)), 0) + 30),
+  [segments])
+
   const marks = useMemo(() => {
-    const dur = Math.max(
-      60,
-      segments.reduce((max, s) =>
-        Math.max(max, s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)),
-        0,
-      ) + 30,
-    )
-    const count = Math.ceil(dur / INTERVAL_SEC) + 2
+    const count = Math.ceil(totalDur / INTERVAL_SEC) + 2
     return Array.from({ length: count }, (_, i) => i * INTERVAL_SEC)
-  }, [segments])
+  }, [totalDur])
+
+  const beatMarkers = useMemo(() => {
+    const bpm = bpmConfig.bpm
+    if (!bpm || bpm <= 0) return []
+    const beatDur = 60 / bpm
+    const gap = beatDur * px
+    if (gap < 3) return []
+    const count = Math.ceil(totalDur / beatDur)
+    return Array.from({ length: count }, (_, i) => i * beatDur)
+  }, [bpmConfig.bpm, px, totalDur])
 
   const loopDragStartXRef = useRef(0)
 
@@ -117,6 +125,13 @@ export default function TimeRuler({
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       >
+        {/* Beat markers */}
+        {beatMarkers.map((t, i) => (
+          <div key={i} style={{
+            position: 'absolute', top: 0, bottom: 0, left: t * px, width: 1,
+            background: 'rgba(225,29,72,0.25)', pointerEvents: 'none', zIndex: 1,
+          }} />
+        ))}
         {/* Loop region highlight */}
         {loopRegion && loopWidth > 0 && (
           <div

@@ -2,7 +2,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { WorkerMessage } from './exportWorker'
 import { useAppStore } from '../../store/useAppStore'
-import { writeExportFile } from '../saveManager'
+import { writeExportFile, getUniqueExportFilename } from '../saveManager'
 
 export type ExportStatus = 'idle' | 'running' | 'done' | 'error'
 
@@ -89,11 +89,13 @@ export function useExport(): ExportState {
         setLabel('Done!')
         setStatus('done')
         const ext = projectSettings.format === 'webm' ? 'webm' : 'mp4'
-        const filename = `browsercutter-export.${ext}`
-        writeExportFile(msg.buffer, filename)
-          .then((saved) => { if (!saved) downloadBuffer(msg.buffer, filename) })
-          .catch(() => downloadBuffer(msg.buffer, filename))
-          .finally(() => { workerRef.current = null })
+        const baseName = 'browsercutter-export'
+        ;(async () => {
+          const filename = await getUniqueExportFilename(baseName, ext)
+          const saved = await writeExportFile(msg.buffer, filename).catch(() => false)
+          if (!saved) downloadBuffer(msg.buffer, `${baseName}.${ext}`)
+          workerRef.current = null
+        })()
       } else if (msg.type === 'error') {
         setErrorMsg(msg.message)
         setStatus('error')

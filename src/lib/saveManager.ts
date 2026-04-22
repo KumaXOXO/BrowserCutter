@@ -125,6 +125,27 @@ export async function loadProjectFromDir(): Promise<{ ok: boolean; data?: Record
   }
 }
 
+export async function getUniqueExportFilename(baseName: string, ext: string): Promise<string> {
+  if (!_saveDir) return `${baseName}.${ext}`
+  try {
+    const exportDir = await _saveDir.getDirectoryHandle('export', { create: true })
+    let candidate = `${baseName}.${ext}`
+    let n = 2
+    for (;;) {
+      try {
+        await exportDir.getFileHandle(candidate)
+        candidate = `${baseName}_${n}.${ext}`
+        n++
+      } catch {
+        break
+      }
+    }
+    return candidate
+  } catch {
+    return `${baseName}.${ext}`
+  }
+}
+
 export async function writeExportFile(buffer: ArrayBuffer, filename: string): Promise<boolean> {
   if (!_saveDir) return false
   try {

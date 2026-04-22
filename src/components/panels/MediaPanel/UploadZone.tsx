@@ -4,20 +4,29 @@ import { openVideoFiles, fileToClip } from '../../../lib/video/fileHandler'
 import { useAppStore } from '../../../store/useAppStore'
 
 export default function UploadZone() {
-  const addClip = useAppStore((s) => s.addClip)
+  const { addClip, updateClip } = useAppStore()
+
+  async function processFiles(files: File[]) {
+    for (const file of files) {
+      const { clips } = useAppStore.getState()
+      const existing = clips.find((c) => c.name === file.name && !c.file)
+      if (existing) {
+        updateClip(existing.id, { file })
+      } else {
+        const clip = await fileToClip(file)
+        addClip(clip)
+      }
+    }
+  }
 
   async function handleUpload() {
     const files = await openVideoFiles()
-    for (const file of files) {
-      const clip = await fileToClip(file)
-      addClip(clip)
-    }
+    await processFiles(files)
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
-    const files = Array.from(e.dataTransfer.files)
-    Promise.all(files.map(fileToClip)).then((clips) => clips.forEach(addClip))
+    processFiles(Array.from(e.dataTransfer.files))
   }
 
   return (

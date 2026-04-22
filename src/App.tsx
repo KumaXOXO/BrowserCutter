@@ -25,7 +25,8 @@ export default function App() {
   const showRightPanel = activeTab === 'effects'
 
   const usedClipIds = new Set(segments.map((s) => s.clipId))
-  const missingFileCount = clips.filter((c) => usedClipIds.has(c.id) && !c.file).length
+  const missingClips = clips.filter((c) => usedClipIds.has(c.id) && !c.file)
+  const missingFileCount = missingClips.length
 
   const [timelineHeight, setTimelineHeight] = useState(
     () => Math.min(MAX_TIMELINE_HEIGHT, Math.max(MIN_TIMELINE_HEIGHT, Number(localStorage.getItem('bc:timeline:height')) || DEFAULT_TIMELINE_HEIGHT)),
@@ -99,8 +100,8 @@ export default function App() {
         <TopBar />
         {missingFileCount > 0 && (
           <div className="flex items-center justify-center gap-2 shrink-0 text-xs" style={{ background: 'rgba(234,179,8,0.12)', borderBottom: '1px solid rgba(234,179,8,0.3)', padding: '5px 12px', color: '#FDE68A' }}>
-            <span style={{ fontWeight: 600 }}>⚠ {missingFileCount} clip{missingFileCount > 1 ? 's' : ''} need re-importing.</span>
-            <span style={{ color: 'rgba(253,230,138,0.7)' }}>Re-upload the original files in the Media tab to restore playback and export.</span>
+            <span style={{ fontWeight: 600 }}>⚠ {missingFileCount} clip{missingFileCount > 1 ? 's' : ''} need re-importing:</span>
+            <span style={{ color: 'rgba(253,230,138,0.7)' }}>{missingClips.slice(0, 3).map((c) => c.name).join(', ')}{missingClips.length > 3 ? ` +${missingClips.length - 3} more` : ''}. Re-upload in the Media tab to restore playback and export.</span>
           </div>
         )}
         <div className="flex overflow-hidden" style={{ flex: '1 1 0', minHeight: 0 }}>

@@ -4,7 +4,7 @@ import { Undo2, Redo2, Save, FolderOpen, HelpCircle } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import ExportModal from '../export/ExportModal'
 import ShortcutsModal from './ShortcutsModal'
-import { saveProjectFile, loadProjectFromDir, hasSaveDir, getSaveDirName } from '../../lib/saveManager'
+import { saveProjectFile, loadProjectFromDir, hasSaveDir, getSaveDirName, ensureSaveDir } from '../../lib/saveManager'
 
 export function validateProjectJSON(json: unknown): { valid: true; data: Record<string, unknown> } | { valid: false; error: string } {
   if (typeof json !== 'object' || json === null || Array.isArray(json)) {
@@ -85,7 +85,29 @@ export default function TopBar() {
     }
   }
 
+  async function handleExportClick() {
+    if (!hasSaveDir()) {
+      await ensureSaveDir()
+    }
+    if (hasSaveDir()) {
+      const { segments } = useAppStore.getState()
+      if (segments.length > 0) {
+        const r = await saveProjectFile()
+        if (r.ok) {
+          setSavedOnce(true)
+          setSaveDirName(getSaveDirName())
+          setHasUnsavedChanges(false)
+        }
+      }
+    }
+    setShowExport(true)
+  }
+
   async function handleLoadClick() {
+    if (hasUnsavedChanges) {
+      const proceed = window.confirm('You have unsaved changes. Load a new project anyway? Unsaved changes will be lost.')
+      if (!proceed) return
+    }
     if ('showDirectoryPicker' in window) {
       const result = await loadProjectFromDir()
       if (!result.ok) {
@@ -200,9 +222,7 @@ export default function TopBar() {
           )}
         </GhostBtn>
         <PrimaryBtn
-          onClick={() => setShowExport(true)}
-          disabled={!savedOnce}
-          title={!savedOnce ? 'Save your project first before exporting' : undefined}
+          onClick={handleExportClick}
         >
           Export Video
         </PrimaryBtn>

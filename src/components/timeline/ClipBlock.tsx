@@ -27,7 +27,7 @@ const TRANSITION_SYMBOLS: Record<string, string> = {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, updateSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips, timelineMode, resizeEnabled } = useAppStore()
+  const { selectedElement, setSelectedElement, updateSegment, splitSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, clips, timelineMode, resizeEnabled, playheadPosition } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
   const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
@@ -65,9 +65,14 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
   // Move drag: mousedown on body
   const handleBodyMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (timelineMode === 'playhead') return  // let event bubble to track for playhead jump
+
     e.stopPropagation()
 
-    if (timelineMode === 'playhead') return
+    if (timelineMode === 'cut') {
+      splitSegment(segment.id, playheadPosition)
+      return
+    }
 
     if (e.ctrlKey || e.metaKey) {
       toggleSegmentSelection(segment.id)
@@ -137,6 +142,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       const trackEl = els.find((el) => el instanceof HTMLElement && el.dataset.trackIndex !== undefined) as HTMLElement | undefined
       const targetTrackIndex = trackEl ? parseInt(trackEl.dataset.trackIndex!, 10) : null
       const targetTrackType = trackEl?.dataset.trackType ?? null
+      document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: targetTrackIndex }))
 
       if (multiIds.length > 1) {
         multiIds.forEach((id) => {
@@ -167,6 +173,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     }
     const handleMouseUp = () => {
       dragEl.style.pointerEvents = ''
+      document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: null }))
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
@@ -206,7 +213,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
     const handleMouseMove = (ev: MouseEvent) => {
       const dSec = (ev.clientX - startX) / px
-      const newOutPoint = Math.max(segRef.current.inPoint + 0.1, Math.min(clip.duration, initialOutPoint + dSec))
+      const maxOut = (clip.type === 'video' || clip.type === 'audio') ? clip.duration : Infinity
+      const newOutPoint = Math.max(segRef.current.inPoint + 0.1, Math.min(maxOut, initialOutPoint + dSec))
       updateSegment(segment.id, { outPoint: newOutPoint })
     }
     const handleMouseUp = () => {
@@ -275,11 +283,12 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         left, width,
         borderRadius: 5,
         background: bg,
-        cursor: timelineMode === 'playhead' ? 'default' : 'grab',
+        cursor: timelineMode === 'playhead' ? 'default' : timelineMode === 'cut' ? 'crosshair' : 'grab',
+        userSelect: 'none',
         display: 'flex',
         alignItems: 'center',
         overflow: 'hidden',
-        outline: isSelected ? '2px solid rgba(255,255,255,0.9)' : isMultiSelected ? '2px solid rgba(100,180,255,0.8)' : 'none',
+        outline: (isSelected || isMultiSelected) ? '2px solid #F43F5E' : 'none',
         outlineOffset: 1,
         opacity: segment.hidden ? 0.4 : 1,
         filter: hovered && !isSelected ? 'brightness(1.2)' : undefined,

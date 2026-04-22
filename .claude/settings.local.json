@@ -64,7 +64,29 @@
       "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"plan-eng-review\",\"type\":\"pitfall\",\"key\":\"plan-wrong-file-path\",\"insight\":\"Plan initially had wrong path src/components/playback/PlaybackControls.tsx; actual path is src/components/preview/PlaybackControls.tsx. Always verify file paths against actual codebase before reviewing plan specs.\",\"confidence\":10,\"source\":\"observed\",\"files\":[\"src/components/preview/PlaybackControls.tsx\"]}')",
       "Bash(npx vite *)",
       "Skill(ship)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Skill(autoplan)",
+      "mcp__ccs-image-analysis__ImageAnalysis",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
+      "mcp__firecrawl-mcp__firecrawl_browser_create",
+      "Bash(npx playwright *)",
+      "Bash(ls node_modules/@playwright)",
+      "Bash(ls node_modules/playwright)",
+      "Bash(pip show *)",
+      "Bash(cat)",
+      "Bash(python /tmp/test_preview.py)",
+      "Bash(python /tmp/test_preview2.py)",
+      "Bash(python /tmp/test3.py)",
+      "Bash(python /tmp/test4.py)",
+      "Bash(python /tmp/test5.py)",
+      "Bash(python /tmp/test6.py)",
+      "Bash(python /tmp/test7.py)",
+      "Bash(python /tmp/test8.py)",
+      "Bash(grep -v \"//.*github\")",
+      "Skill(browse)",
+      "Skill(gstack-upgrade)",
+      "Bash(Start-Process -NoNewWindow npx -ArgumentList \"vite\",\"--port\",\"5173\")",
+      "Bash(curl -s http://localhost:5173)"
     ]
   }
 }
