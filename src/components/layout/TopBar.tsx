@@ -20,7 +20,7 @@ export function validateProjectJSON(json: unknown): { valid: true; data: Record<
 export default function TopBar() {
   const { projectName, setProjectName, undo, redo, canUndo, canRedo, loadProject } = useAppStore()
   const [saved, setSaved] = useState(false)
-  const [savedOnce, setSavedOnce] = useState(hasSaveDir())
+  const [, setSavedOnce] = useState(hasSaveDir())
   const [saveDirName, setSaveDirName] = useState<string | null>(getSaveDirName())
   const [showExport, setShowExport] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)

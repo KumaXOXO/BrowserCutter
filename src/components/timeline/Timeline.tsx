@@ -40,7 +40,7 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
   useEffect(() => { zoomRef.current = zoom }, [zoom])
 
   const {
-    playheadPosition, setPlayheadPosition, setIsPlaying,
+    playheadPosition, setPlayheadPosition,
     tracks, updateTrack, removeTrack, moveTrack,
     timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled,
     projectSettings, updateProjectSettings,
