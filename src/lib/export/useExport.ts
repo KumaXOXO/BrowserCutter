@@ -56,11 +56,21 @@ export function useExport(): ExportState {
       return
     }
 
+    const unreadable: string[] = []
     for (const clip of clips) {
       if (!needed.has(clip.id)) continue
       if (!clip.file) continue
-      const buffer = await clip.file.arrayBuffer()
-      clipData[clip.id] = { buffer, name: clip.name }
+      try {
+        const buffer = await clip.file.arrayBuffer()
+        clipData[clip.id] = { buffer, name: clip.name }
+      } catch {
+        unreadable.push(clip.name)
+      }
+    }
+    if (unreadable.length > 0) {
+      setErrorMsg(`Cannot read ${unreadable.length} file(s): ${unreadable.slice(0, 3).join(', ')}${unreadable.length > 3 ? '…' : ''}. Re-import them in the Media tab and try again.`)
+      setStatus('error')
+      return
     }
 
     const worker = new Worker(

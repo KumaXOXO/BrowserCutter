@@ -33,7 +33,7 @@ const ADD_OPTIONS: { type: TimelineTrack['type']; label: string }[] = [
 export default function Timeline({ height = 205, isDragging = false }: Props) {
   const [zoom, setZoom] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
-  const { playheadPosition, tracks, updateTrack, removeTrack, moveTrack, timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled } = useAppStore()
+  const { playheadPosition, tracks, updateTrack, removeTrack, moveTrack, timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled, projectSettings, updateProjectSettings } = useAppStore()
 
   // Shift+Mousewheel zoom
   useEffect(() => {
@@ -128,6 +128,20 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         style={{ height: 30, background: 'var(--surface)', borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center gap-2 relative">
+          <button
+            title={projectSettings.snapToBeat ? 'Snap: Grid — clips snap to beat. Click for Free.' : 'Snap: Free — clips move freely. Click for Grid.'}
+            onClick={() => updateProjectSettings({ snapToBeat: !projectSettings.snapToBeat })}
+            className="text-xs rounded cursor-pointer transition-all duration-150"
+            style={{
+              padding: '2px 7px',
+              border: `1px solid ${projectSettings.snapToBeat ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
+              background: projectSettings.snapToBeat ? 'rgba(225,29,72,0.1)' : 'transparent',
+              color: projectSettings.snapToBeat ? '#F43F5E' : 'var(--muted2)',
+              fontWeight: 600, letterSpacing: '0.04em',
+            }}
+          >
+            {projectSettings.snapToBeat ? 'GRID' : 'FREE'}
+          </button>
           <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--muted-subtle)', fontSize: 10 }}>Timeline</span>
           <button
             className="text-xs rounded cursor-pointer transition-all duration-150"

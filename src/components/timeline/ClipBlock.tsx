@@ -124,7 +124,12 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
     const handleMouseMove = (ev: MouseEvent) => {
       const curScroll = scrollContainer?.scrollLeft ?? 0
-      const newStart = Math.max(0, (ev.clientX - trackRect.left + curScroll - offsetX) / px)
+      const { projectSettings: ps, bpmConfig } = useAppStore.getState()
+      const beatDuration = ps.snapToBeat ? 60 / Math.max(1, bpmConfig.bpm) : 0
+      const rawStart = Math.max(0, (ev.clientX - trackRect.left + curScroll - offsetX) / px)
+      const newStart = beatDuration > 0
+        ? Math.round(rawStart / beatDuration) * beatDuration
+        : rawStart
       const primaryDelta = newStart - (startPositions[segment.id] ?? segment.startOnTimeline)
 
       // Detect target track under cursor for cross-timeline drag
