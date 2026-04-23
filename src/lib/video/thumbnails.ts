@@ -20,7 +20,7 @@ export async function getThumbnail(clipId: string, file: File, inPoint: number):
     if (url) {
       if (cache.size >= CACHE_MAX) {
         const oldest = cache.keys().next().value
-        if (oldest) { URL.revokeObjectURL(cache.get(oldest)!); cache.delete(oldest) }
+        if (oldest) cache.delete(oldest)
       }
       cache.set(key, url)
     }

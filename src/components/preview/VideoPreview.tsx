@@ -114,14 +114,24 @@ export default function VideoPreview() {
     if (isPlaying) return
     const video = videoRef.current
     if (!video) return
-    if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
-    if (!activeClip?.file || activeClip.type === 'image') { video.removeAttribute('src'); video.load(); return }
+    // Clear src BEFORE revoking to prevent ERR_FILE_NOT_FOUND while browser still holds a reference
+    if (objectUrlRef.current) {
+      video.removeAttribute('src')
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    if (!activeClip?.file || activeClip.type === 'image') { video.load(); return }
     const url = URL.createObjectURL(activeClip.file)
     objectUrlRef.current = url
     video.src = url
-    // Capture url in closure — don't read objectUrlRef at cleanup time because the
-    // RAF tick may have already swapped it to the next segment's URL.
-    return () => { URL.revokeObjectURL(url); if (objectUrlRef.current === url) objectUrlRef.current = null }
+    // Only revoke in cleanup when NOT playing: during playback the RAF tick owns all URLs.
+    // Revoking while playing causes ERR_FILE_NOT_FOUND when the tick's video element tries
+    // to use the same URL on the next RAF frame.
+    return () => {
+      if (useAppStore.getState().isPlaying) return
+      URL.revokeObjectURL(url)
+      if (objectUrlRef.current === url) objectUrlRef.current = null
+    }
   }, [activeClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load image blob URL for image clips — must be state (not ref) to trigger re-render
@@ -275,7 +285,7 @@ export default function VideoPreview() {
         startSeg = nextVideoSeg
       } else {
         // Playhead is in a gap before nextVideoSeg — start tick in gap mode (shows black screen)
-        if (video) { video.removeAttribute('src'); video.load() }
+        if (video) { video.style.opacity = '0'; video.removeAttribute('src'); video.load() }
         activeSegRef.current = null
         gapInitialTarget = nextVideoSeg
       }

@@ -67,10 +67,22 @@ function TextBlock({ overlay, px, isSelected, onSelect, onUpdate }: TextBlockPro
   const width = Math.max(4, overlay.duration * px)
   const overlayRef = useRef(overlay)
   overlayRef.current = overlay
-  const { resizeEnabled } = useAppStore()
+  const { resizeEnabled, timelineMode, selectedTextIds, setSelectedTextIds } = useAppStore()
 
   function handleBodyMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (timelineMode === 'playhead') return  // let click bubble for playhead positioning
+
     e.stopPropagation()
+
+    if (e.ctrlKey || e.metaKey) {
+      if (selectedTextIds.includes(overlay.id)) {
+        setSelectedTextIds(selectedTextIds.filter((id) => id !== overlay.id))
+      } else {
+        setSelectedTextIds([...selectedTextIds, overlay.id])
+      }
+      return
+    }
+
     onSelect()
 
     const trackContent = (e.currentTarget as HTMLElement).parentElement!

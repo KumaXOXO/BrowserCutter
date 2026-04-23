@@ -183,6 +183,7 @@ export function startVideoTick(params: VideoTickParams): void {
         video.volume = Math.min(1, (ns.volume ?? 1) * masterVolumeRef.current)
         video.playbackRate = ns.speed ?? 1
         video.muted = ns.muted ?? false
+        video.style.opacity = '1'
         playAbortRef.current = { cancelled: false }
         cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
         activeSegRef.current = ns
@@ -314,9 +315,11 @@ export function startVideoTick(params: VideoTickParams): void {
           // ── Enter gap mode: clear video → black, advance playhead by real time ──
           cancelPlayRef.current()
           video.pause()
-          if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
+          // Clear src BEFORE revoking to prevent ERR_FILE_NOT_FOUND
           video.removeAttribute('src')
           video.load()
+          video.style.opacity = '0'
+          if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
           activeSegRef.current = null
           inGap = true
           gapRealStart = performance.now()
