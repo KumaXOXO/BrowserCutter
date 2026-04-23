@@ -142,7 +142,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       const trackEl = els.find((el) => el instanceof HTMLElement && el.dataset.trackIndex !== undefined) as HTMLElement | undefined
       const targetTrackIndex = trackEl ? parseInt(trackEl.dataset.trackIndex!, 10) : null
       const targetTrackType = trackEl?.dataset.trackType ?? null
-      document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: targetTrackIndex }))
+      document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: targetTrackIndex !== null ? { trackIndex: targetTrackIndex, clipType: clip.type } : null }))
 
       if (multiIds.length > 1) {
         multiIds.forEach((id) => {
@@ -173,7 +173,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     }
     const handleMouseUp = () => {
       dragEl.style.pointerEvents = ''
-      document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: null }))
+      document.dispatchEvent(new CustomEvent<null>('bc:drag-track', { detail: null }))
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }

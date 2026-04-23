@@ -81,6 +81,7 @@ export interface BpmConfig {
   outputDuration: number
   outputUnit: 'seconds' | 'beats'
   selectedClipIds: ClipId[]
+  onlyWholeClips?: boolean
 }
 
 export interface TimelineTrack {

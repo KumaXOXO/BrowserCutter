@@ -175,6 +175,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     outputDuration: 30,
     outputUnit: 'seconds',
     selectedClipIds: [],
+    onlyWholeClips: true,
   },
 
   // ─── Timeline mode ───

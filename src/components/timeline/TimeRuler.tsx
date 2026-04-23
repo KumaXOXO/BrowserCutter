@@ -12,14 +12,14 @@ export default function TimeRuler({
   trackLabelWidth: number
   zoom: number
 }) {
-  const { setPlayheadPosition, setIsPlaying, loopRegion, setLoopRegion, segments, bpmConfig } = useAppStore()
+  const { setPlayheadPosition, setIsPlaying, loopRegion, setLoopRegion, segments, bpmConfig, projectSettings, playheadPosition } = useAppStore()
   const px = PX_PER_SEC * zoom
   const markWidth = px * INTERVAL_SEC
 
   const totalDur = useMemo(() =>
-    Math.max(60, segments.reduce((max, s) =>
-      Math.max(max, s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)), 0) + 30),
-  [segments])
+    Math.max(600, playheadPosition + 120, segments.reduce((max, s) =>
+      Math.max(max, s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)), 0) + 120),
+  [segments, playheadPosition])
 
   const marks = useMemo(() => {
     const count = Math.ceil(totalDur / INTERVAL_SEC) + 2
@@ -27,6 +27,7 @@ export default function TimeRuler({
   }, [totalDur])
 
   const beatMarkers = useMemo(() => {
+    if (!projectSettings.snapToBeat) return []
     const bpm = bpmConfig.bpm
     if (!bpm || bpm <= 0) return []
     const beatDur = 60 / bpm
@@ -34,12 +35,20 @@ export default function TimeRuler({
     if (gap < 3) return []
     const count = Math.ceil(totalDur / beatDur)
     return Array.from({ length: count }, (_, i) => i * beatDur)
-  }, [bpmConfig.bpm, px, totalDur])
+  }, [bpmConfig.bpm, px, totalDur, projectSettings.snapToBeat])
 
   const loopDragStartXRef = useRef(0)
 
   function xToSec(x: number) {
     return Math.max(0, x / px)
+  }
+
+  function snapSec(sec: number): number {
+    if (!projectSettings.snapToBeat) return sec
+    const bpm = bpmConfig.bpm
+    if (!bpm || bpm <= 0) return sec
+    const beatDur = 60 / bpm
+    return Math.round(sec / beatDur) * beatDur
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {
@@ -50,13 +59,13 @@ export default function TimeRuler({
       e.preventDefault()
       // Start drawing a new loop region
       loopDragStartXRef.current = x
-      const sec = xToSec(x)
+      const sec = snapSec(xToSec(x))
       setLoopRegion({ start: sec, end: sec })
 
       const onMove = (ev: MouseEvent) => {
         const nx = ev.clientX - rect.left
-        const ns = xToSec(nx)
-        const a = xToSec(loopDragStartXRef.current)
+        const ns = snapSec(xToSec(nx))
+        const a = snapSec(xToSec(loopDragStartXRef.current))
         setLoopRegion({ start: Math.min(a, ns), end: Math.max(a, ns) })
       }
       const onUp = () => {
@@ -76,7 +85,7 @@ export default function TimeRuler({
         // Drag left edge
         const onMove = (ev: MouseEvent) => {
           const nx = ev.clientX - rect.left
-          const ns = Math.max(0, Math.min(loopRegion.end - 0.1, xToSec(nx)))
+          const ns = snapSec(Math.max(0, Math.min(loopRegion.end - 0.1, xToSec(nx))))
           setLoopRegion({ start: ns, end: loopRegion.end })
         }
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
@@ -88,7 +97,7 @@ export default function TimeRuler({
         // Drag right edge
         const onMove = (ev: MouseEvent) => {
           const nx = ev.clientX - rect.left
-          const ns = Math.max(loopRegion.start + 0.1, xToSec(nx))
+          const ns = snapSec(Math.max(loopRegion.start + 0.1, xToSec(nx)))
           setLoopRegion({ start: loopRegion.start, end: ns })
         }
         const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }

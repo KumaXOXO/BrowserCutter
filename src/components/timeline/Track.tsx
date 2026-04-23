@@ -14,24 +14,34 @@ interface Props {
 }
 
 export default function Track({ trackIndex, trackType, label, icon, height, zoom, trackLabelWidth }: Props) {
-  const { segments, clips, addSegment, timelineMode, setPlayheadPosition, setSelectedElement, setSelectedSegmentIds } = useAppStore()
+  const { segments, clips, addSegment, timelineMode, setPlayheadPosition, setSelectedElement, setSelectedSegmentIds, playheadPosition } = useAppStore()
   const [dragTarget, setDragTarget] = useState(false)
 
   useEffect(() => {
     const handler = (e: Event) => {
-      setDragTarget((e as CustomEvent<number | null>).detail === trackIndex)
+      const detail = (e as CustomEvent<{ trackIndex: number | null; clipType: string } | null>).detail
+      if (!detail || detail.trackIndex === null) {
+        setDragTarget(false)
+        return
+      }
+      if (detail.trackIndex !== trackIndex) { setDragTarget(false); return }
+      const compatible =
+        ((detail.clipType === 'video' || detail.clipType === 'image') && trackType === 'video') ||
+        (detail.clipType === 'audio' && trackType === 'audio')
+      setDragTarget(compatible)
     }
     document.addEventListener('bc:drag-track', handler)
     return () => document.removeEventListener('bc:drag-track', handler)
-  }, [trackIndex])
+  }, [trackIndex, trackType])
   const trackSegments = segments.filter((s) => s.trackIndex === trackIndex)
 
   const totalWidth = Math.max(
-    700,
+    4000,
+    (playheadPosition + 120) * PX_PER_SEC * zoom,
     trackSegments.reduce((max, s) =>
       Math.max(max, (s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1)) * PX_PER_SEC * zoom),
       0,
-    ) + 300,
+    ) + 600,
   )
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {

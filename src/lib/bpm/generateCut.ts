@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { Clip, Segment, BpmConfig } from '../../types'
 
 export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex = 0, startOffset = 0): Segment[] {
-  const { bpm, mode, segmentLength, outputDuration, outputUnit, selectedClipIds } = config
+  const { bpm, mode, segmentLength, outputDuration, outputUnit, selectedClipIds, onlyWholeClips } = config
 
   const pool = clips.filter((c) => selectedClipIds.includes(c.id) && c.type === 'video')
   if (pool.length === 0) return []
@@ -17,6 +17,10 @@ export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex =
   else if (mode === 'random') segs = generateRandom(pool, segDuration, totalSeconds)
   else if (mode === 'normal') segs = generateNormal(pool, segDuration, totalSeconds)
   else segs = generateForfeit(pool, segDuration, totalSeconds)
+
+  if ((onlyWholeClips ?? true) && segDuration > 0.001) {
+    segs = segs.filter((s) => (s.outPoint - s.inPoint) >= segDuration * 0.99)
+  }
 
   return segs.map((s) => ({
     ...s,

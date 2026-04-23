@@ -208,6 +208,15 @@ export default function BpmPanel() {
             />
             Append to timeline (instead of replace)
           </label>
+          <label className="flex items-center gap-2 cursor-pointer text-xs" style={{ color: 'var(--muted2)' }}>
+            <input
+              type="checkbox"
+              checked={bpmConfig.onlyWholeClips}
+              style={{ accentColor: '#E11D48' }}
+              onChange={(e) => updateBpmConfig({ onlyWholeClips: e.target.checked })}
+            />
+            Only import complete segments (skip partial clips at end)
+          </label>
         </div>
       )}
 

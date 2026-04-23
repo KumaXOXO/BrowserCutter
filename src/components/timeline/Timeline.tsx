@@ -208,13 +208,14 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
             {projectSettings.snapToBeat ? 'GRID' : 'FREE'}
           </button>
 
-          {/* BPM input */}
+          {/* BPM input — disabled in Free mode */}
           <input
             type="number"
-            title="BPM for grid snapping"
+            title={projectSettings.snapToBeat ? 'BPM for grid snapping' : 'Enable Grid to edit BPM'}
             min={20} max={300}
             value={bpmConfig.bpm ?? ''}
             placeholder="–"
+            disabled={!projectSettings.snapToBeat}
             onChange={(e) => {
               const v = Number(e.target.value)
               if (v >= 20 && v <= 300) updateBpmConfig({ bpm: v })
@@ -222,11 +223,14 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
             style={{
               width: 52, fontSize: 10, textAlign: 'center',
               background: 'transparent', border: '1px solid var(--border-subtle)',
-              color: 'var(--muted2)', borderRadius: 4, padding: '2px 4px',
+              color: projectSettings.snapToBeat ? 'var(--muted2)' : 'var(--muted-subtle)',
+              borderRadius: 4, padding: '2px 4px',
               outline: 'none',
+              opacity: projectSettings.snapToBeat ? 1 : 0.4,
+              cursor: projectSettings.snapToBeat ? 'text' : 'not-allowed',
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(225,29,72,0.5)'; e.currentTarget.style.color = 'var(--text)' }}
-            onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--muted2)' }}
+            onFocus={(e) => { if (projectSettings.snapToBeat) { e.currentTarget.style.borderColor = 'rgba(225,29,72,0.5)'; e.currentTarget.style.color = 'var(--text)' } }}
+            onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = projectSettings.snapToBeat ? 'var(--muted2)' : 'var(--muted-subtle)' }}
           />
 
           <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--muted-subtle)', fontSize: 10 }}>Timeline</span>
@@ -302,14 +306,23 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       <div ref={scrollRef} className="flex-1 overflow-auto relative">
         <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} zoom={zoom} />
         <div style={{ position: 'relative' }}>
-          {/* Playhead line */}
+          {/* Playhead line — fully draggable in playhead mode */}
           <div
-            style={{ position: 'absolute', top: 0, bottom: 0, left: playheadLeft, width: 1.5, background: '#E11D48', zIndex: 20, pointerEvents: 'none' }}
+            onMouseDown={handlePlayheadMouseDown}
+            onMouseEnter={() => setPlayheadHovered(true)}
+            onMouseLeave={() => setPlayheadHovered(false)}
+            style={{
+              position: 'absolute', top: 0, bottom: 0, left: playheadLeft,
+              width: enlarged ? 3 : 1.5,
+              background: enlarged ? 'rgba(228,29,72,0.9)' : '#E11D48',
+              zIndex: 20,
+              cursor: timelineMode === 'playhead' ? 'col-resize' : 'default',
+              pointerEvents: timelineMode === 'playhead' ? 'auto' : 'none',
+              transition: 'width 80ms, background 80ms',
+            }}
           >
+            {/* Triangle head */}
             <div
-              onMouseDown={handlePlayheadMouseDown}
-              onMouseEnter={() => setPlayheadHovered(true)}
-              onMouseLeave={() => setPlayheadHovered(false)}
               style={{
                 position: 'absolute',
                 top: -2, left: enlarged ? -7 : -5,
@@ -319,8 +332,7 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
                 clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
                 borderRadius: 2,
                 transition: 'all 100ms',
-                cursor: timelineMode === 'playhead' ? 'col-resize' : 'default',
-                pointerEvents: 'auto',
+                pointerEvents: 'none',
               }}
             />
           </div>

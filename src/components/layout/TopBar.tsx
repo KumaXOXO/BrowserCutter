@@ -25,6 +25,7 @@ export default function TopBar() {
   const [showExport, setShowExport] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showExportDirDialog, setShowExportDirDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const hasUnsavedRef = useRef(hasUnsavedChanges)
   useEffect(() => { hasUnsavedRef.current = hasUnsavedChanges }, [hasUnsavedChanges])
@@ -87,9 +88,14 @@ export default function TopBar() {
 
   async function handleExportClick() {
     if (!hasSaveDir()) {
-      await ensureSaveDir()
+      setShowExportDirDialog(true)
+      return
     }
-    if (hasSaveDir()) {
+    await doExport(true)
+  }
+
+  async function doExport(withSave: boolean) {
+    if (withSave && hasSaveDir()) {
       const { segments } = useAppStore.getState()
       if (segments.length > 0) {
         const r = await saveProjectFile()
@@ -101,6 +107,17 @@ export default function TopBar() {
       }
     }
     setShowExport(true)
+  }
+
+  async function handleExportDirCreate() {
+    setShowExportDirDialog(false)
+    await ensureSaveDir()
+    await doExport(true)
+  }
+
+  async function handleExportDirSkip() {
+    setShowExportDirDialog(false)
+    await doExport(false)
   }
 
   async function handleLoadClick() {
@@ -236,6 +253,44 @@ export default function TopBar() {
       />
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
       {showShortcuts && <ShortcutsModal onClose={handleCloseShortcuts} />}
+      {showExportDirDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setShowExportDirDialog(false)}
+        >
+          <div
+            className="rounded-2xl p-6 flex flex-col gap-4"
+            style={{ background: 'var(--surface2)', border: '1px solid var(--border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.8)', maxWidth: 380, width: '90%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text)' }}>No project folder</h3>
+              <p className="text-xs mt-1.5" style={{ color: 'var(--muted2)' }}>
+                BrowserCutter saves exported videos to your project folder. Would you like to create one first?
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleExportDirCreate}
+                className="rounded-lg text-sm font-semibold text-white"
+                style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#E11D48,#C41232)', border: 'none', cursor: 'pointer' }}
+              >
+                Create project folder and export
+              </button>
+              <button
+                onClick={handleExportDirSkip}
+                className="rounded-lg text-sm"
+                style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--muted2)', cursor: 'pointer' }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--muted2)' }}
+              >
+                Export without project folder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

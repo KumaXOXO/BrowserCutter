@@ -36,8 +36,8 @@ const ffmpeg = new FFmpeg()
 
 self.onmessage = async (e: MessageEvent<ExportRequest>) => {
   const timeout = setTimeout(() => {
-    self.postMessage({ type: 'error', message: 'Export timed out after 60 seconds' } satisfies WorkerMessage)
-  }, 60_000)
+    self.postMessage({ type: 'error', message: 'Export timed out after 10 minutes. Try a shorter clip or lower quality.' } satisfies WorkerMessage)
+  }, 600_000)
 
   try {
     await runExport(e.data)
