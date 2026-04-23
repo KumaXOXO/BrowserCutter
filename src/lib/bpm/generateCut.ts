@@ -1,6 +1,6 @@
 // src/lib/bpm/generateCut.ts
 import { v4 as uuidv4 } from 'uuid'
-import type { Clip, Segment, BpmConfig, BpmMode } from '../../types'
+import type { Clip, Segment, BpmConfig } from '../../types'
 
 export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex = 0, startOffset = 0): Segment[] {
   const { bpm, mode, segmentLength, outputDuration, outputUnit, selectedClipIds, onlyWholeClips, importMode } = config
@@ -8,15 +8,12 @@ export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex =
   const pool = clips.filter((c) => selectedClipIds.includes(c.id) && c.type === 'video')
   if (pool.length === 0) return []
 
-  // Full-length mode: each clip placed at its complete duration, ordered by cutting mode
-  if (importMode === 'full') {
-    const segs = generateFullLength(pool, mode)
-    return segs.map((s) => ({ ...s, trackIndex: targetTrackIndex, startOnTimeline: s.startOnTimeline + startOffset }))
-  }
-
   const beatDuration = 60 / bpm
   const segDuration = beatDuration * segmentLength
-  const totalSeconds = outputUnit === 'beats' ? outputDuration * beatDuration : outputDuration
+  // Full-length mode: cut by BPM/segment-length across all clip content (no manual duration limit)
+  const totalSeconds = importMode === 'full'
+    ? pool.reduce((sum, c) => sum + c.duration, 0)
+    : outputUnit === 'beats' ? outputDuration * beatDuration : outputDuration
 
   let segs: Segment[]
   if (mode === 'sequential') segs = generateSequential(pool, segDuration, totalSeconds)
@@ -35,41 +32,6 @@ export function generateCut(clips: Clip[], config: BpmConfig, targetTrackIndex =
   }))
 }
 
-function generateFullLength(pool: Clip[], mode: BpmMode): Segment[] {
-  let ordered: Clip[]
-  if (mode === 'random') {
-    ordered = [...pool]
-    for (let i = ordered.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[ordered[i], ordered[j]] = [ordered[j], ordered[i]]
-    }
-  } else if (mode === 'forfeit') {
-    // Alternating pattern: slot A and slot B interleaved
-    const a = pool.filter((_, i) => i % 2 === 0)
-    const b = pool.filter((_, i) => i % 2 === 1)
-    ordered = []
-    for (let i = 0; i < Math.max(a.length, b.length); i++) {
-      if (i < a.length) ordered.push(a[i])
-      if (i < b.length) ordered.push(b[i])
-    }
-  } else {
-    // sequential / normal: clips in pool order
-    ordered = pool
-  }
-  let timeline = 0
-  return ordered.map((clip) => {
-    const seg: Segment = {
-      id: uuidv4(),
-      clipId: clip.id,
-      trackIndex: 0,
-      startOnTimeline: timeline,
-      inPoint: 0,
-      outPoint: clip.duration,
-    }
-    timeline += clip.duration
-    return seg
-  })
-}
 
 function generateSequential(pool: Clip[], segDuration: number, totalSeconds: number): Segment[] {
   const segments: Segment[] = []

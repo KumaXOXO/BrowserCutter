@@ -13,7 +13,7 @@ export interface ExportRequest {
     startOnTimeline: number; inPoint: number; outPoint: number
     volume?: number; speed?: number; effects?: import('../../types').Effect[]
   }>
-  clipData: Record<string, { buffer: ArrayBuffer; name: string }>
+  clipFiles: Record<string, { file: File; name: string }>
   fps: number
   resolution: string
   transitions: Transition[]
@@ -50,7 +50,15 @@ self.onmessage = async (e: MessageEvent<ExportRequest>) => {
 }
 
 async function runExport(req: ExportRequest) {
-  post({ type: 'progress', value: 0.02, label: 'Loading FFmpeg...' })
+  post({ type: 'progress', value: 0.01, label: 'Reading media files...' })
+
+  // Read file buffers inside the worker — keeps the main thread responsive for large files.
+  const clipData: Record<string, { buffer: ArrayBuffer; name: string }> = {}
+  for (const [id, { file, name }] of Object.entries(req.clipFiles)) {
+    clipData[id] = { buffer: await file.arrayBuffer(), name }
+  }
+
+  post({ type: 'progress', value: 0.05, label: 'Loading FFmpeg...' })
 
   const BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
   await ffmpeg.load({
@@ -68,7 +76,7 @@ async function runExport(req: ExportRequest) {
 
   const writtenFiles = new Set<string>()
   for (const seg of v1Segs) {
-    const cd = req.clipData[seg.clipId]
+    const cd = clipData[seg.clipId]
     if (!cd) throw new Error(`Missing clip data for segment ${seg.id}`)
     const ext = cd.name.split('.').pop()?.toLowerCase() ?? 'mp4'
     const fname = `clip_${seg.clipId}.${ext}`
@@ -95,7 +103,7 @@ async function runExport(req: ExportRequest) {
   // preventing timestamp discontinuities when segments are non-contiguous in the source file.
   const inputs: string[] = []
   for (const seg of v1Segs) {
-    const cd = req.clipData[seg.clipId]
+    const cd = clipData[seg.clipId]
     const ext = cd.name.split('.').pop()?.toLowerCase() ?? 'mp4'
     inputs.push('-i', `clip_${seg.clipId}.${ext}`)
   }

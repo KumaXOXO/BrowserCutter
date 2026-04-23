@@ -49,6 +49,11 @@ export default function BpmPanel() {
   const segStepIndex = SEG_STEPS.findIndex((v) => Math.abs(v - bpmConfig.segmentLength) < 0.001)
   const currentStepIndex = segStepIndex >= 0 ? segStepIndex : 5
 
+  const isFullLength = (bpmConfig.importMode ?? 'fixed') === 'full'
+  const fullLengthSeconds = videoClips
+    .filter((c) => bpmConfig.selectedClipIds.includes(c.id))
+    .reduce((sum, c) => sum + c.duration, 0)
+
   return (
     <div className="flex flex-col gap-4 p-3.5 overflow-y-auto h-full">
       {/* Header */}
@@ -149,7 +154,7 @@ export default function BpmPanel() {
       <div>
         <PanelLabel>Import Mode</PanelLabel>
         <div className="flex mt-1.5 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-          {([['fixed', 'By BPM'], ['full', 'Full Length']] as const).map(([id, label]) => {
+          {([['fixed', 'By Duration'], ['full', 'Full Length']] as const).map(([id, label]) => {
             const active = (bpmConfig.importMode ?? 'fixed') === id
             return (
               <button
@@ -167,28 +172,31 @@ export default function BpmPanel() {
             )
           })}
         </div>
+        {isFullLength && (
+          <p className="text-xs mt-1.5" style={{ color: 'var(--muted-subtle)' }}>
+            Cuts all selected clips by BPM until they end — no duration limit.
+          </p>
+        )}
       </div>
 
-      {/* Segment length — slider (hidden in full-length mode) */}
-      {(bpmConfig.importMode ?? 'fixed') === 'fixed' && (
-        <div>
-          <PanelLabel>Segment Length — {segStepLabel(SEG_STEPS[currentStepIndex])} beat{SEG_STEPS[currentStepIndex] !== 1 ? 's' : ''}</PanelLabel>
-          <input
-            type="range"
-            className="mt-1.5"
-            min={0} max={SEG_STEPS.length - 1} step={1}
-            value={currentStepIndex}
-            style={{ width: '100%', accentColor: '#E11D48', cursor: 'pointer' }}
-            onChange={(e) => updateBpmConfig({ segmentLength: SEG_STEPS[Number(e.target.value)] })}
-          />
-          <div className="flex justify-between text-xs mt-0.5" style={{ color: 'var(--muted-subtle)', fontSize: 9 }}>
-            <span>1/32</span><span>1</span><span>32</span>
-          </div>
+      {/* Segment length — always visible, applies in both modes */}
+      <div>
+        <PanelLabel>Segment Length — {segStepLabel(SEG_STEPS[currentStepIndex])} beat{SEG_STEPS[currentStepIndex] !== 1 ? 's' : ''}</PanelLabel>
+        <input
+          type="range"
+          className="mt-1.5"
+          min={0} max={SEG_STEPS.length - 1} step={1}
+          value={currentStepIndex}
+          style={{ width: '100%', accentColor: '#E11D48', cursor: 'pointer' }}
+          onChange={(e) => updateBpmConfig({ segmentLength: SEG_STEPS[Number(e.target.value)] })}
+        />
+        <div className="flex justify-between text-xs mt-0.5" style={{ color: 'var(--muted-subtle)', fontSize: 9 }}>
+          <span>1/32</span><span>1</span><span>32</span>
         </div>
-      )}
+      </div>
 
-      {/* Output (hidden in full-length mode) */}
-      {(bpmConfig.importMode ?? 'fixed') === 'fixed' && (
+      {/* Output duration — only in By Duration mode */}
+      {!isFullLength ? (
         <div>
           <PanelLabel>Output Duration</PanelLabel>
           <div className="flex gap-1 mt-1.5">
@@ -211,6 +219,14 @@ export default function BpmPanel() {
               <option value="beats">beats</option>
             </select>
           </div>
+        </div>
+      ) : (
+        <div>
+          <PanelLabel>Output Duration — auto</PanelLabel>
+          <p className="text-xs mt-1.5" style={{ color: 'var(--muted2)' }}>
+            {Math.floor(fullLengthSeconds / 60)}:{String(Math.floor(fullLengthSeconds % 60)).padStart(2, '0')}
+            {' '}({fullLengthSeconds > 0 ? `${fullLengthSeconds.toFixed(1)}s` : 'select clips above'})
+          </p>
         </div>
       )}
 

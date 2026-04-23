@@ -46,7 +46,7 @@ export function useExport(): ExportState {
     setLabel('Preparing...')
     setErrorMsg('')
 
-    const clipData: Record<string, { buffer: ArrayBuffer; name: string }> = {}
+    const clipFiles: Record<string, { file: File; name: string }> = {}
     const needed = new Set(videoSegs.map((s) => s.clipId))
 
     const missingFiles = clips.filter((c) => needed.has(c.id) && !c.file).map((c) => c.name)
@@ -56,15 +56,16 @@ export function useExport(): ExportState {
       return
     }
 
+    // Lightweight accessibility check: read 1 byte to verify each file is reachable.
+    // The full buffer is read inside the worker to keep the main thread responsive.
     const notAllowed: string[] = []
     const notReadable: string[] = []
     const otherErrors: string[] = []
     for (const clip of clips) {
-      if (!needed.has(clip.id)) continue
-      if (!clip.file) continue
+      if (!needed.has(clip.id) || !clip.file) continue
       try {
-        const buffer = await clip.file.arrayBuffer()
-        clipData[clip.id] = { buffer, name: clip.name }
+        await clip.file.slice(0, 1).arrayBuffer()
+        clipFiles[clip.id] = { file: clip.file, name: clip.name }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'NotAllowedError') notAllowed.push(clip.name)
         else if (e instanceof DOMException && e.name === 'NotReadableError') notReadable.push(clip.name)
@@ -126,26 +127,23 @@ export function useExport(): ExportState {
       workerRef.current = null
     }
 
-    const transferBuffers = Object.values(clipData).map((c) => c.buffer)
-
     const resolution = projectSettings.resolution === 'custom'
       ? `${projectSettings.customWidth ?? 1920}x${projectSettings.customHeight ?? 1080}`
       : projectSettings.resolution
     const fps = projectSettings.fps === 0 ? (projectSettings.customFps ?? 30) : projectSettings.fps
 
-    worker.postMessage(
-      {
-        segments: videoSegs,
-        clipData,
-        fps,
-        resolution,
-        transitions,
-        adjustmentLayers,
-        format: projectSettings.format,
-        quality: projectSettings.quality,
-      },
-      transferBuffers,
-    )
+    // File objects are structured-cloned (no data copied yet); the worker reads
+    // the full buffers itself so the main thread never blocks on large files.
+    worker.postMessage({
+      segments: videoSegs,
+      clipFiles,
+      fps,
+      resolution,
+      transitions,
+      adjustmentLayers,
+      format: projectSettings.format,
+      quality: projectSettings.quality,
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { status, progress, label, errorMsg, startExport, cancel }

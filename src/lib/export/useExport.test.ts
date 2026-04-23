@@ -9,7 +9,8 @@ function makeClipWithError(id: string, error: Error | DOMException): Clip {
   return {
     id,
     name: `${id}.mp4`,
-    file: { arrayBuffer: vi.fn().mockRejectedValue(error) } as unknown as File,
+    // Validation now reads a 1-byte slice; mock slice() to trigger the right error path.
+    file: { slice: vi.fn().mockReturnValue({ arrayBuffer: vi.fn().mockRejectedValue(error) }) } as unknown as File,
     duration: 5,
     width: 1920,
     height: 1080,
