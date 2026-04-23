@@ -25,7 +25,7 @@ export async function ensureSaveDir(): Promise<FileSystemDirectoryHandle | null>
   return pickDir()
 }
 
-export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string }> {
+export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string; skippedFiles?: string[] }> {
   const { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips, tracks } = useAppStore.getState()
 
   if ('showDirectoryPicker' in window) {
@@ -35,6 +35,7 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string 
     }
     try {
       // Copy media files to media/ subdirectory
+      const skippedFiles: string[] = []
       const mediaDir = await _saveDir!.getDirectoryHandle('media', { create: true })
       const serializedClips = await Promise.all(clips.map(async ({ file, ...meta }) => {
         if (!file) return meta
@@ -45,6 +46,7 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string 
           await writable.close()
           return { ...meta, mediaPath: `media/${file.name}` }
         } catch {
+          skippedFiles.push(file.name)
           return meta
         }
       }))
@@ -54,7 +56,7 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string 
       const writable = await fh.createWritable()
       await writable.write(JSON.stringify(data, null, 2))
       await writable.close()
-      return { ok: true }
+      return { ok: true, skippedFiles }
     } catch (e: unknown) {
       // Only reset the saved directory when the handle is no longer valid
       // (e.g. user deleted the folder). Transient I/O errors keep the handle.

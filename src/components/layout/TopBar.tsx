@@ -20,6 +20,7 @@ export function validateProjectJSON(json: unknown): { valid: true; data: Record<
 export default function TopBar() {
   const { projectName, setProjectName, undo, redo, canUndo, canRedo, loadProject } = useAppStore()
   const [saved, setSaved] = useState(false)
+  const [savedPartial, setSavedPartial] = useState<string | null>(null)
   const [, setSavedOnce] = useState(hasSaveDir())
   const [saveDirName, setSaveDirName] = useState<string | null>(getSaveDirName())
   const [showExport, setShowExport] = useState(false)
@@ -81,6 +82,10 @@ export default function TopBar() {
       setSaved(true)
       setHasUnsavedChanges(false)
       setTimeout(() => setSaved(false), 1800)
+      if (result.skippedFiles?.length) {
+        setSavedPartial(`${result.skippedFiles.length} file(s) not copied`)
+        setTimeout(() => setSavedPartial(null), 4000)
+      }
     } else if (result.reason !== 'cancelled') {
       alert(`Save failed: ${result.reason}`)
     }
@@ -103,6 +108,10 @@ export default function TopBar() {
           setSavedOnce(true)
           setSaveDirName(getSaveDirName())
           setHasUnsavedChanges(false)
+          if (r.skippedFiles?.length) {
+            setSavedPartial(`${r.skippedFiles.length} file(s) not copied`)
+            setTimeout(() => setSavedPartial(null), 4000)
+          }
         }
       }
     }
@@ -233,7 +242,7 @@ export default function TopBar() {
         </GhostBtn>
         <GhostBtn onClick={handleSave}>
           <Save size={13} />
-          {saved ? 'Saved!' : saveDirName ? `Save (${saveDirName})` : 'Save'}
+          {savedPartial ? `Saved* (${savedPartial})` : saved ? 'Saved!' : saveDirName ? `Save (${saveDirName})` : 'Save'}
           {hasUnsavedChanges && !saved && (
             <span title="Unsaved changes" style={{ width: 6, height: 6, borderRadius: '50%', background: '#E11D48', display: 'inline-block', marginLeft: 2, flexShrink: 0 }} />
           )}

@@ -86,3 +86,52 @@ describe('loadProjectFromDir — Change 1: FSAPI permission fix', () => {
     expect(clips[0].file).toBeUndefined()
   })
 })
+
+describe('saveProjectFile — Change 2: surface silent save failures', () => {
+  function makeSaveDir(opts: {
+    writeFails?: boolean
+    filename?: string
+  } = {}) {
+    const { writeFails = false, filename = 'clip.mp4' } = opts
+    const writable = {
+      write: writeFails
+        ? vi.fn().mockRejectedValue(new DOMException('disk full', 'QuotaExceededError'))
+        : vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    }
+    const mediaFileFh = { createWritable: vi.fn().mockResolvedValue(writable) }
+    const mediaDirFh = { getFileHandle: vi.fn().mockResolvedValue(mediaFileFh) }
+    const projectWritable = { write: vi.fn().mockResolvedValue(undefined), close: vi.fn().mockResolvedValue(undefined) }
+    const projectFh = { createWritable: vi.fn().mockResolvedValue(projectWritable) }
+    const saveDir = {
+      getDirectoryHandle: vi.fn().mockResolvedValue(mediaDirFh),
+      getFileHandle: vi.fn().mockImplementation((name: string) =>
+        name === 'project.json' ? Promise.resolve(projectFh) : Promise.resolve(mediaFileFh)
+      ),
+      name: 'my-project',
+    }
+    return { saveDir, filename }
+  }
+
+  it('returns skippedFiles containing the filename when a media copy throws', async () => {
+    const { saveDir, filename } = makeSaveDir({ writeFails: true, filename: 'clip.mp4' })
+    vi.stubGlobal('showDirectoryPicker', vi.fn().mockResolvedValue(saveDir))
+
+    // Reset modules so _saveDir starts null regardless of earlier tests in this file
+    vi.resetModules()
+    const { ensureSaveDir, saveProjectFile } = await import('./saveManager')
+    const { useAppStore } = await import('../store/useAppStore')
+
+    await ensureSaveDir() // sets _saveDir = saveDir on the fresh module instance
+
+    const fakeFile = new File([new ArrayBuffer(4)], filename, { type: 'video/mp4' })
+    const prevClips = useAppStore.getState().clips
+    useAppStore.setState({ clips: [{ id: 'c1', name: filename, file: fakeFile, duration: 1, width: 0, height: 0, type: 'video' }] })
+
+    const result = await saveProjectFile()
+    useAppStore.setState({ clips: prevClips })
+
+    expect(result.ok).toBe(true)
+    expect(result.skippedFiles).toContain(filename)
+  })
+})
