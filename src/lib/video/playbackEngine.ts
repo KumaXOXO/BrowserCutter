@@ -26,6 +26,26 @@ function videoIndices(tracks: TimelineTrack[]): Set<number> {
 function audioIndices(tracks: TimelineTrack[]): Set<number> {
   return new Set(tracks.filter((t) => t.type === 'audio' && !t.muted).map((t) => t.trackIndex))
 }
+
+// Returns the topmost segment (by track array position, i.e. upper tracks first)
+// covering the given timeline position. Used to enforce display hierarchy.
+function findTopSegmentAtTime(
+  time: number,
+  segments: Segment[],
+  tracks: TimelineTrack[],
+  vIdx: Set<number>,
+): Segment | null {
+  const candidates = segments.filter(
+    (s) => vIdx.has(s.trackIndex) && !s.hidden &&
+      time >= s.startOnTimeline &&
+      time < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1),
+  )
+  return candidates.sort((a, b) =>
+    tracks.findIndex((t) => t.trackIndex === a.trackIndex) -
+    tracks.findIndex((t) => t.trackIndex === b.trackIndex),
+  )[0] ?? null
+}
+
 import { applyTransitionStyles } from './transitionStyles'
 
 // playWhenReady — calls media.play() once the element is buffered enough.
@@ -142,11 +162,7 @@ export function startVideoTick(params: VideoTickParams): void {
       if (loop && pos >= loop.end) {
         inGap = false; gapNextSeg = null
         const vIdx2 = videoIndices(tracksRef.current)
-        const loopStartSeg = segmentsRef.current
-          .filter((s) => vIdx2.has(s.trackIndex) && !s.hidden &&
-            loop.start >= s.startOnTimeline &&
-            loop.start < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1))
-          .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
+        const loopStartSeg = findTopSegmentAtTime(loop.start, segmentsRef.current, tracksRef.current, vIdx2)
         if (loopStartSeg && video) {
           const loopClip = clipsRef.current.find((c) => c.id === loopStartSeg.clipId)
           if (loopClip?.file) {
@@ -222,14 +238,62 @@ export function startVideoTick(params: VideoTickParams): void {
     const currentPlayhead = seg.startOnTimeline + (rawTime - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
     setPlayheadPosition(currentPlayhead)
 
+    // ── Priority check: if a higher-priority track segment now covers the playhead,
+    // switch to it immediately. This ensures the display hierarchy is always correct
+    // and prevents the playhead from ever jumping backwards.
+    const correctSeg = findTopSegmentAtTime(currentPlayhead, segmentsRef.current, tracksRef.current, vIdx)
+    const correctClip = correctSeg ? clipsRef.current.find((c) => c.id === correctSeg.clipId) : null
+    if (correctSeg && correctSeg.id !== seg.id && correctClip?.type !== 'image' && correctClip?.file) {
+      cancelPlayRef.current()
+      // Clear any in-progress transition overlay
+      if (transitionUrlRef.current && transitionVideoRef.current) {
+        URL.revokeObjectURL(transitionUrlRef.current)
+        transitionUrlRef.current = null
+        transitionVideoRef.current.pause()
+        transitionVideoRef.current.src = ''
+        transitionVideoRef.current.style.display = 'none'
+        video.style.opacity = '1'
+        video.style.transform = ''
+        video.style.clipPath = ''
+      }
+      const seekTime = correctSeg.inPoint +
+        (currentPlayhead - correctSeg.startOnTimeline) * Math.max(0.01, correctSeg.speed ?? 1)
+      if (correctClip.id === seg.clipId && objectUrlRef.current) {
+        video.currentTime = seekTime
+        video.volume = Math.min(1, (correctSeg.volume ?? 1) * masterVolumeRef.current)
+        video.playbackRate = correctSeg.speed ?? 1
+        video.muted = correctSeg.muted ?? false
+        playAbortRef.current = { cancelled: false }
+        const abort = playAbortRef.current
+        video.play().catch((err: unknown) => {
+          if (abort.cancelled) return
+          if (err instanceof DOMException && err.name === 'AbortError') return
+          setIsPlaying(false)
+        })
+        cancelPlayRef.current = () => { abort.cancelled = true }
+      } else {
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+        const url = URL.createObjectURL(correctClip.file)
+        objectUrlRef.current = url
+        video.style.opacity = '1'
+        video.src = url
+        video.currentTime = seekTime
+        video.volume = Math.min(1, (correctSeg.volume ?? 1) * masterVolumeRef.current)
+        video.playbackRate = correctSeg.speed ?? 1
+        video.muted = correctSeg.muted ?? false
+        playAbortRef.current = { cancelled: false }
+        cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
+      }
+      activeSegRef.current = correctSeg
+      stallCountRef.current = 0
+      rafRef.current = requestAnimationFrame(tick)
+      return
+    }
+
     // Loop region: when playhead passes the end, seek back to start
     const loop = loopRegionRef.current
     if (loop && currentPlayhead >= loop.end) {
-      const loopStartSeg = segmentsRef.current
-        .filter((s) => vIdx.has(s.trackIndex) && !s.hidden &&
-          loop.start >= s.startOnTimeline &&
-          loop.start < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1))
-        .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
+      const loopStartSeg = findTopSegmentAtTime(loop.start, segmentsRef.current, tracksRef.current, vIdx)
 
       if (loopStartSeg) {
         const loopClip = clipsRef.current.find((c) => c.id === loopStartSeg.clipId)
@@ -268,10 +332,18 @@ export function startVideoTick(params: VideoTickParams): void {
       audioRef.current.pause()
     }
 
-    // Resolve next video segment
-    const nextSeg = segmentsRef.current
-      .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline > seg.startOnTimeline)
-      .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0]
+    // Segment end and next-segment resolution.
+    // segEnd is the timeline position where the current segment ends.
+    const segEnd = seg.startOnTimeline + (seg.outPoint - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
+
+    // Find what should play just after segEnd: first check if any segment covers segEnd+epsilon
+    // (an overlapping lower-priority or same-priority segment), otherwise look for the next one.
+    const coveringNext = findTopSegmentAtTime(segEnd + 0.001, segmentsRef.current, tracksRef.current, vIdx)
+    const fallbackNext = coveringNext ? null : segmentsRef.current
+      .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline > segEnd)
+      .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
+    const nextSeg = coveringNext ?? fallbackNext ?? null
+    const hasGap = !coveringNext && !!fallbackNext && fallbackNext.startOnTimeline > segEnd + 0.1
 
     // Transition preload: for dissolve/wipe/slide/zoom, load B early and animate
     if (nextSeg && transitionVideoRef.current) {
@@ -303,11 +375,14 @@ export function startVideoTick(params: VideoTickParams): void {
       }
     }
 
-    // Segment-end swap / gap entry
-    const segEnd = seg.startOnTimeline + (seg.outPoint - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
-    const hasGap = !!nextSeg && nextSeg.startOnTimeline > segEnd + 0.1
-    // For transitions to adjacent segments, preload early; for gaps, wait to the very end
+    // For transitions to adjacent segments, preload early; for gaps, wait to the very end.
     const swapThreshold = hasGap ? 0.033 : Math.max(0.15, 0.15 * (seg.speed ?? 1))
+
+    // Compute the seek time into nextSeg at swap moment.
+    // If nextSeg started before segEnd (overlapping lower-priority segment), seek to the right position.
+    const nextSeekTime = nextSeg && nextSeg.startOnTimeline < segEnd
+      ? nextSeg.inPoint + (segEnd - nextSeg.startOnTimeline) * Math.max(0.01, nextSeg.speed ?? 1)
+      : nextSeg?.inPoint ?? 0
 
     if (rawTime >= seg.outPoint - swapThreshold) {
       if (nextSeg) {
@@ -340,7 +415,7 @@ export function startVideoTick(params: VideoTickParams): void {
             transitionVideoRef.current.src = ''
             video.style.opacity = '1'; video.style.transform = ''; video.style.clipPath = ''
             transitionVideoRef.current.style.display = 'none'
-            video.currentTime = nextSeg.inPoint
+            video.currentTime = nextSeekTime
             video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
             video.playbackRate = nextSeg.speed ?? 1
             video.muted = nextSeg.muted ?? false
@@ -373,7 +448,7 @@ export function startVideoTick(params: VideoTickParams): void {
             stallCountRef.current = 0
             if (nextClip.id === seg.clipId && objectUrlRef.current) {
               // Same-clip: just seek, call play() directly to avoid canplaythrough wait lag
-              video.currentTime = nextSeg.inPoint
+              video.currentTime = nextSeekTime
               video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
               video.playbackRate = nextSeg.speed ?? 1
               video.muted = nextSeg.muted ?? false
@@ -391,7 +466,7 @@ export function startVideoTick(params: VideoTickParams): void {
               const url = URL.createObjectURL(nextClip.file)
               objectUrlRef.current = url
               video.src = url
-              video.currentTime = nextSeg.inPoint
+              video.currentTime = nextSeekTime
               video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
               video.playbackRate = nextSeg.speed ?? 1
               video.muted = nextSeg.muted ?? false
