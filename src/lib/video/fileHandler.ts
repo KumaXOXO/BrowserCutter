@@ -41,8 +41,20 @@ export async function fileToClip(file: File): Promise<Clip> {
     return { id, file, name: file.name, duration, width: 0, height: 0, type }
   }
 
-  // image
-  const thumbnail = URL.createObjectURL(file)
+  // image — convert to data URL so it persists across project save/load
+  const thumbnail = await new Promise<string>((resolve) => {
+    const blobUrl = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 160; canvas.height = 90
+      canvas.getContext('2d')!.drawImage(img, 0, 0, 160, 90)
+      URL.revokeObjectURL(blobUrl)
+      resolve(canvas.toDataURL('image/jpeg', 0.7))
+    }
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve('') }
+    img.src = blobUrl
+  })
   return { id, file, name: file.name, duration: 5, width: 0, height: 0, type, thumbnail }
 }
 

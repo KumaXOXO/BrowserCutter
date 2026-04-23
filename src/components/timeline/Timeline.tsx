@@ -89,10 +89,12 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         }
       }
 
-      // Ctrl+A: select all segments in all tracks (text/adjustment stay independently selected)
+      // Ctrl+A: select all segments + all text overlays
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'a') {
         e.preventDefault()
+        const { textOverlays, setSelectedTextIds } = store
         setSelectedSegmentIds(segments.map((s) => s.id))
+        setSelectedTextIds(textOverlays.map((o) => o.id))
         return
       }
 

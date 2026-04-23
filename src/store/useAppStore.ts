@@ -20,6 +20,7 @@ interface AppState {
   mediaSubTab: MediaSubTab
   selectedElement: SelectedElement | null
   selectedSegmentIds: string[]  // multi-select
+  selectedTextIds: string[]     // multi-select for text overlays
 
   // ─── Project ───
   projectName: string
@@ -56,6 +57,7 @@ interface AppState {
   setMediaSubTab: (tab: MediaSubTab) => void
   setSelectedElement: (el: SelectedElement | null) => void
   setSelectedSegmentIds: (ids: string[]) => void
+  setSelectedTextIds: (ids: string[]) => void
   toggleSegmentSelection: (id: string) => void
   setProjectName: (name: string) => void
   updateProjectSettings: (settings: Partial<ProjectSettings>) => void
@@ -123,6 +125,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mediaSubTab: 'videos',
   selectedElement: null,
   selectedSegmentIds: [],
+  selectedTextIds: [],
 
   // ─── Project ───
   projectName: 'Untitled Project',
@@ -188,8 +191,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMediaSubTab: (tab) => set({ mediaSubTab: tab }),
-  setSelectedElement: (el) => set({ selectedElement: el, activeTab: el ? 'inspector' : 'media', selectedSegmentIds: [] }),
+  setSelectedElement: (el) => set({ selectedElement: el, activeTab: el ? 'inspector' : 'media', selectedSegmentIds: [], selectedTextIds: [] }),
   setSelectedSegmentIds: (ids) => set({ selectedSegmentIds: ids }),
+  setSelectedTextIds: (ids) => set({ selectedTextIds: ids }),
   toggleSegmentSelection: (id) => set((s) => ({
     selectedSegmentIds: s.selectedSegmentIds.includes(id)
       ? s.selectedSegmentIds.filter((x) => x !== id)
@@ -292,6 +296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       playheadPosition: 0,
       selectedElement: null,
       selectedSegmentIds: [],
+      selectedTextIds: [],
       _history: [],
       _future: [],
     })

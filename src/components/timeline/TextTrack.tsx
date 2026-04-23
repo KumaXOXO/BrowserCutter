@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function TextTrack({ zoom, trackLabelWidth, trackId }: Props) {
-  const { textOverlays, selectedElement, setSelectedElement, updateTextOverlay, playheadPosition } = useAppStore()
+  const { textOverlays, selectedElement, selectedTextIds, setSelectedElement, updateTextOverlay, playheadPosition } = useAppStore()
   const px = PX_PER_SEC * zoom
 
   const visibleOverlays = textOverlays.filter((o) =>
@@ -44,7 +44,7 @@ export default function TextTrack({ zoom, trackLabelWidth, trackId }: Props) {
             key={overlay.id}
             overlay={overlay}
             px={px}
-            isSelected={selectedElement?.id === overlay.id}
+            isSelected={selectedElement?.id === overlay.id || selectedTextIds.includes(overlay.id)}
             onSelect={() => setSelectedElement({ type: 'text', id: overlay.id })}
             onUpdate={(patch) => updateTextOverlay(overlay.id, patch)}
           />
@@ -67,6 +67,7 @@ function TextBlock({ overlay, px, isSelected, onSelect, onUpdate }: TextBlockPro
   const width = Math.max(4, overlay.duration * px)
   const overlayRef = useRef(overlay)
   overlayRef.current = overlay
+  const { resizeEnabled } = useAppStore()
 
   function handleBodyMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     e.stopPropagation()
@@ -95,6 +96,7 @@ function TextBlock({ overlay, px, isSelected, onSelect, onUpdate }: TextBlockPro
   }
 
   function handleRightTrimMouseDown(e: React.MouseEvent) {
+    if (!resizeEnabled) return
     e.stopPropagation()
     const startX = e.clientX
     const initialDur = overlayRef.current.duration
@@ -133,16 +135,18 @@ function TextBlock({ overlay, px, isSelected, onSelect, onUpdate }: TextBlockPro
       <span style={{ fontSize: 9, fontWeight: 600, color: '#FDE68A', padding: '0 5px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
         T {overlay.text.slice(0, 14)}{overlay.text.length > 14 ? '…' : ''}
       </span>
-      {/* Right trim handle */}
-      <div
-        onMouseDown={handleRightTrimMouseDown}
-        style={{
-          position: 'absolute', right: 0, top: 0, bottom: 0, width: 6,
-          cursor: 'ew-resize', zIndex: 2,
-          background: 'rgba(255,255,255,0.2)',
-          borderRadius: '0 4px 4px 0',
-        }}
-      />
+      {/* Right trim handle — only visible when resizeEnabled */}
+      {resizeEnabled && (
+        <div
+          onMouseDown={handleRightTrimMouseDown}
+          style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: 6,
+            cursor: 'ew-resize', zIndex: 2,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '0 4px 4px 0',
+          }}
+        />
+      )}
     </div>
   )
 }

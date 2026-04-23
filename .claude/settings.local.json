@@ -86,7 +86,9 @@
       "Skill(browse)",
       "Skill(gstack-upgrade)",
       "Bash(Start-Process -NoNewWindow npx -ArgumentList \"vite\",\"--port\",\"5173\")",
-      "Bash(curl -s http://localhost:5173)"
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(git ls-remote *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

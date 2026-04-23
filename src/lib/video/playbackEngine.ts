@@ -1,6 +1,5 @@
 // src/lib/video/playbackEngine.ts
 // Extracted from VideoPreview.tsx to stay under the 300-LOC project limit.
-// Contains playWhenReady, the video RAF tick, and the audio-only RAF tick.
 //
 // Playback state machine:
 //
@@ -9,14 +8,13 @@
 //  setIsPlaying(true)                                                 │
 //        │                                                            │
 //        ▼                                                            │
-//  [Resolve startSeg]                                                 │
+//  [Resolve startSeg or gap]                                          │
 //   ├─ empty timeline ──────────────────────── setIsPlaying(false) ──┤
 //   ├─ audio-only ──── playWhenReady(audio) ── tickAudioOnly RAF ────┤
-//   │                          │ ended event                         │
+//   ├─ gap before first seg ── tick (gap mode) ── swap at segStart ──┤
 //   └─ has video ──── playWhenReady(video) ─── tick RAF ─────────────┤
-//                              │ segment end                         │
-//                              ▼                                      │
-//                      [swap video.src] ── playWhenReady(video) ─────┤
+//                              │ segment end (no gap) → swap ────────┤
+//                              │ segment end (gap) → gap mode ───────┤
 //                              │ no next seg                         │
 //                              └─────────────── setIsPlaying(false) ─┘
 
@@ -41,6 +39,7 @@ export function playWhenReady(
     if (abortRef.cancelled) return
     media.play().catch((err: unknown) => {
       if (err instanceof DOMException && err.name === 'AbortError') return
+      console.error('[VideoPreview] play() failed:', err, 'src:', media.src.slice(0, 60))
       onFail()
     })
   }
@@ -49,7 +48,13 @@ export function playWhenReady(
     return () => {}
   }
   let onReady: (() => void) | null = null
-  const onError = () => { if (!abortRef.cancelled) onFail() }
+  const onError = () => {
+    if (!abortRef.cancelled) {
+      const me = (media as HTMLVideoElement).error
+      console.error('[VideoPreview] media error:', me?.code, me?.message, 'src:', media.src.slice(0, 60))
+      onFail()
+    }
+  }
   media.addEventListener('error', onError, { once: true })
   const schedule = (event: 'canplaythrough' | 'canplay') => {
     if (onReady) {
@@ -59,8 +64,8 @@ export function playWhenReady(
     onReady = () => { media.removeEventListener('error', onError); onReady = null; tryPlay() }
     media.addEventListener(event, onReady, { once: true })
   }
-  schedule('canplaythrough')
-  const timer = setTimeout(() => schedule('canplay'), 5000)
+  schedule('canplay')
+  const timer = setTimeout(() => schedule('canplay'), 3000)
   return () => {
     clearTimeout(timer)
     if (onReady) {
@@ -85,20 +90,19 @@ export interface VideoTickParams {
   cancelPlayRef: { current: () => void }
   playAbortRef: { current: { cancelled: boolean } }
   masterVolumeRef: { current: number }
-  // Transition overlay — second video element for dissolve/wipe/slide/zoom
   transitionVideoRef: { current: HTMLVideoElement | null }
   transitionUrlRef: { current: string | null }
   transitionsRef: { current: Transition[] }
   loopRegionRef: { current: { start: number; end: number } | null }
   setPlayheadPosition: (pos: number) => void
   setIsPlaying: (playing: boolean) => void
+  // If playhead starts in a gap before this segment, begin in gap mode immediately
+  initialGapTarget?: Segment | null
+  initialPlayheadPosition?: number
 }
 
-// TRANSITION_TYPES that use the second video element (fade is handled by CSS overlay in VideoPreview)
 const OVERLAY_TRANSITIONS: TransitionType[] = ['dissolve', 'wipe', 'slide', 'zoom']
 
-// startVideoTick — starts the RAF loop that drives video playback.
-// Mutually exclusive with startAudioOnlyTick — never run both simultaneously.
 export function startVideoTick(params: VideoTickParams): void {
   const {
     videoRef, audioRef, segmentsRef, clipsRef, tracksRef, activeSegRef,
@@ -108,15 +112,100 @@ export function startVideoTick(params: VideoTickParams): void {
     setPlayheadPosition, setIsPlaying,
   } = params
 
-  const tick = () => {
-    const seg = activeSegRef.current
-    if (!seg || !videoRef.current) return
+  // --- Gap mode state (closure-local, reset on each startVideoTick call) ---
+  let inGap = false
+  let gapRealStart = 0
+  let gapPlayheadStart = 0
+  let gapNextSeg: Segment | null = null
 
-    const rawTime = videoRef.current.currentTime
+  // Start in gap mode if the caller detected the playhead is between segments
+  if (params.initialGapTarget) {
+    inGap = true
+    gapRealStart = performance.now()
+    gapPlayheadStart = params.initialPlayheadPosition ?? 0
+    gapNextSeg = params.initialGapTarget
+  }
+
+  const tick = () => {
+    const video = videoRef.current
+
+    // ────────────────────────────────────────────────────────────────
+    // Gap mode: playhead is between two segments — show black, wait
+    // ────────────────────────────────────────────────────────────────
+    if (inGap) {
+      const elapsed = (performance.now() - gapRealStart) / 1000
+      const pos = gapPlayheadStart + elapsed
+      setPlayheadPosition(pos)
+
+      // Loop region during gap
+      const loop = loopRegionRef.current
+      if (loop && pos >= loop.end) {
+        inGap = false; gapNextSeg = null
+        const vIdx2 = videoIndices(tracksRef.current)
+        const loopStartSeg = segmentsRef.current
+          .filter((s) => vIdx2.has(s.trackIndex) && !s.hidden &&
+            loop.start >= s.startOnTimeline &&
+            loop.start < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1))
+          .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
+        if (loopStartSeg && video) {
+          const loopClip = clipsRef.current.find((c) => c.id === loopStartSeg.clipId)
+          if (loopClip?.file) {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+            const url = URL.createObjectURL(loopClip.file)
+            objectUrlRef.current = url
+            video.src = url
+            video.currentTime = loopStartSeg.inPoint + (loop.start - loopStartSeg.startOnTimeline) * Math.max(0.01, loopStartSeg.speed ?? 1)
+            video.volume = Math.min(1, (loopStartSeg.volume ?? 1) * masterVolumeRef.current)
+            video.playbackRate = loopStartSeg.speed ?? 1
+            video.muted = loopStartSeg.muted ?? false
+            playAbortRef.current = { cancelled: false }
+            cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
+            activeSegRef.current = loopStartSeg
+            stallCountRef.current = 0
+            rafRef.current = requestAnimationFrame(tick)
+            return
+          }
+        }
+        setIsPlaying(false); return
+      }
+
+      // Reached the start of the next segment — exit gap mode
+      if (gapNextSeg && pos >= gapNextSeg.startOnTimeline) {
+        const ns = gapNextSeg
+        inGap = false; gapNextSeg = null
+        const nextClip = clipsRef.current.find((c) => c.id === ns.clipId)
+        if (!nextClip?.file || !video) { setIsPlaying(false); return }
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+        const url = URL.createObjectURL(nextClip.file)
+        objectUrlRef.current = url
+        video.src = url
+        video.currentTime = ns.inPoint
+        video.volume = Math.min(1, (ns.volume ?? 1) * masterVolumeRef.current)
+        video.playbackRate = ns.speed ?? 1
+        video.muted = ns.muted ?? false
+        playAbortRef.current = { cancelled: false }
+        cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
+        activeSegRef.current = ns
+        stallCountRef.current = 0
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+      return
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Normal mode
+    // ────────────────────────────────────────────────────────────────
+    const seg = activeSegRef.current
+    if (!seg || !video) return
+
+    const rawTime = video.currentTime
     const vIdx = videoIndices(tracksRef.current)
     const aIdx = audioIndices(tracksRef.current)
+
+    // Stall detection: ignore if video is actively seeking to avoid false positives
     if (rawTime < seg.inPoint) {
-      if (!videoRef.current?.paused) {
+      if (!video.paused && !video.seeking) {
         stallCountRef.current += 1
         if (stallCountRef.current > 60) {
           stallCountRef.current = 0
@@ -143,29 +232,30 @@ export function startVideoTick(params: VideoTickParams): void {
 
       if (loopStartSeg) {
         const loopClip = clipsRef.current.find((c) => c.id === loopStartSeg.clipId)
-        if (loopClip?.file && videoRef.current) {
+        if (loopClip?.file) {
           cancelPlayRef.current()
           if (loopStartSeg.id !== seg.id) {
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
             const url = URL.createObjectURL(loopClip.file)
             objectUrlRef.current = url
-            videoRef.current.src = url
+            video.src = url
           }
           const seekTime = loopStartSeg.inPoint + (loop.start - loopStartSeg.startOnTimeline) * Math.max(0.01, loopStartSeg.speed ?? 1)
-          videoRef.current.currentTime = seekTime
-          videoRef.current.volume = (loopStartSeg.volume ?? 1) * masterVolumeRef.current
-          videoRef.current.playbackRate = loopStartSeg.speed ?? 1
-          videoRef.current.muted = loopStartSeg.muted ?? false
+          video.currentTime = seekTime
+          video.volume = Math.min(1, (loopStartSeg.volume ?? 1) * masterVolumeRef.current)
+          video.playbackRate = loopStartSeg.speed ?? 1
+          video.muted = loopStartSeg.muted ?? false
           playAbortRef.current = { cancelled: false }
-          cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+          cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
           activeSegRef.current = loopStartSeg
+          stallCountRef.current = 0
           rafRef.current = requestAnimationFrame(tick)
           return
         }
       }
     }
 
-    // Sync audio track: find any audio segment at current playhead (skip muted)
+    // Sync audio track
     const audioSeg = segmentsRef.current.find(
       (s) => aIdx.has(s.trackIndex) && !s.muted &&
         currentPlayhead >= s.startOnTimeline &&
@@ -177,7 +267,7 @@ export function startVideoTick(params: VideoTickParams): void {
       audioRef.current.pause()
     }
 
-    // Resolve next video segment (shared by both transition preload and segment swap)
+    // Resolve next video segment
     const nextSeg = segmentsRef.current
       .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline > seg.startOnTimeline)
       .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0]
@@ -192,7 +282,6 @@ export function startVideoTick(params: VideoTickParams): void {
         const segDuration = (seg.outPoint - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
         const transStart = seg.startOnTimeline + segDuration - trans.duration
         if (currentPlayhead >= transStart) {
-          // Lazy-load B on first entry into transition window
           if (!transitionUrlRef.current) {
             const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
             if (nextClip?.file) {
@@ -200,43 +289,60 @@ export function startVideoTick(params: VideoTickParams): void {
               transitionUrlRef.current = tUrl
               transitionVideoRef.current.src = tUrl
               transitionVideoRef.current.currentTime = nextSeg.inPoint
-              transitionVideoRef.current.volume = 0  // muted while B plays under A
+              transitionVideoRef.current.volume = 0
               transitionVideoRef.current.playbackRate = nextSeg.speed ?? 1
               transitionVideoRef.current.play().catch(() => {})
             }
           }
-          if (transitionUrlRef.current && videoRef.current) {
+          if (transitionUrlRef.current) {
             const progress = Math.min(1, (currentPlayhead - transStart) / trans.duration)
-            applyTransitionStyles(trans.type, progress, videoRef.current, transitionVideoRef.current)
+            applyTransitionStyles(trans.type, progress, video, transitionVideoRef.current!)
           }
         }
       }
     }
 
-    // Speed-adjusted threshold: at 2x speed we cover 0.15s of source in ~75ms real time.
-    // Use a larger window scaled by speed so the swap fires in time regardless of playback rate.
-    const swapThreshold = Math.max(0.15, 0.15 * (seg.speed ?? 1))
+    // Segment-end swap / gap entry
+    const segEnd = seg.startOnTimeline + (seg.outPoint - seg.inPoint) / Math.max(0.01, seg.speed ?? 1)
+    const hasGap = !!nextSeg && nextSeg.startOnTimeline > segEnd + 0.1
+    // For transitions to adjacent segments, preload early; for gaps, wait to the very end
+    const swapThreshold = hasGap ? 0.033 : Math.max(0.15, 0.15 * (seg.speed ?? 1))
+
     if (rawTime >= seg.outPoint - swapThreshold) {
       if (nextSeg) {
-        // If transition B is preloaded, promote it to primary (avoid re-buffering)
-        if (transitionUrlRef.current && transitionVideoRef.current && videoRef.current) {
+        if (hasGap) {
+          // ── Enter gap mode: clear video → black, advance playhead by real time ──
+          cancelPlayRef.current()
+          video.pause()
+          if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
+          video.removeAttribute('src')
+          video.load()
+          activeSegRef.current = null
+          inGap = true
+          gapRealStart = performance.now()
+          gapPlayheadStart = segEnd
+          gapNextSeg = nextSeg
+          setPlayheadPosition(segEnd)
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+
+        // ── No gap — swap to next segment ──
+        if (transitionUrlRef.current && transitionVideoRef.current) {
           cancelPlayRef.current()
           const nextClipForT = clipsRef.current.find((c) => c.id === nextSeg.clipId)
-          // Same-clip check for transition-promoted segment: if same clip, just seek
           if (nextClipForT?.id === seg.clipId && objectUrlRef.current) {
             transitionUrlRef.current = null
             transitionVideoRef.current.pause()
             transitionVideoRef.current.src = ''
-            videoRef.current.style.opacity = '1'
-            videoRef.current.style.transform = ''
-            videoRef.current.style.clipPath = ''
+            video.style.opacity = '1'; video.style.transform = ''; video.style.clipPath = ''
             transitionVideoRef.current.style.display = 'none'
-            videoRef.current.currentTime = nextSeg.inPoint
-            videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
-            videoRef.current.playbackRate = nextSeg.speed ?? 1
-            videoRef.current.muted = nextSeg.muted ?? false
+            video.currentTime = nextSeg.inPoint
+            video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
+            video.playbackRate = nextSeg.speed ?? 1
+            video.muted = nextSeg.muted ?? false
             playAbortRef.current = { cancelled: false }
-            cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+            cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
           } else {
             if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
             const tUrl = transitionUrlRef.current
@@ -244,43 +350,50 @@ export function startVideoTick(params: VideoTickParams): void {
             transitionUrlRef.current = null
             transitionVideoRef.current.pause()
             transitionVideoRef.current.src = ''
-            videoRef.current.style.opacity = '1'
-            videoRef.current.style.transform = ''
-            videoRef.current.style.clipPath = ''
+            video.style.opacity = '1'; video.style.transform = ''; video.style.clipPath = ''
             transitionVideoRef.current.style.display = 'none'
             objectUrlRef.current = tUrl
-            videoRef.current.src = tUrl
-            videoRef.current.currentTime = tTime
-            videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
-            videoRef.current.playbackRate = nextSeg.speed ?? 1
-            videoRef.current.muted = nextSeg.muted ?? false
+            video.src = tUrl
+            video.currentTime = tTime
+            video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
+            video.playbackRate = nextSeg.speed ?? 1
+            video.muted = nextSeg.muted ?? false
             playAbortRef.current = { cancelled: false }
-            cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+            cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
           }
           activeSegRef.current = nextSeg
+          stallCountRef.current = 0
         } else {
           const nextClip = clipsRef.current.find((c) => c.id === nextSeg.clipId)
           if (nextClip?.file) {
             cancelPlayRef.current()
-            // Same-clip optimization: skip URL revoke/recreate, just seek within the current buffer
-            if (nextClip.id === seg.clipId && objectUrlRef.current && videoRef.current) {
-              videoRef.current.currentTime = nextSeg.inPoint
-              videoRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
-              videoRef.current.playbackRate = nextSeg.speed ?? 1
-              videoRef.current.muted = nextSeg.muted ?? false
+            stallCountRef.current = 0
+            if (nextClip.id === seg.clipId && objectUrlRef.current) {
+              // Same-clip: just seek, call play() directly to avoid canplaythrough wait lag
+              video.currentTime = nextSeg.inPoint
+              video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
+              video.playbackRate = nextSeg.speed ?? 1
+              video.muted = nextSeg.muted ?? false
               playAbortRef.current = { cancelled: false }
-              cancelPlayRef.current = playWhenReady(videoRef.current, () => setIsPlaying(false), playAbortRef.current)
+              const abort = playAbortRef.current
+              video.play().catch((err: unknown) => {
+                if (abort.cancelled) return
+                if (err instanceof DOMException && err.name === 'AbortError') return
+                console.error('[VideoPreview] same-clip play() failed:', err)
+                setIsPlaying(false)
+              })
+              cancelPlayRef.current = () => { abort.cancelled = true }
             } else {
               if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
               const url = URL.createObjectURL(nextClip.file)
               objectUrlRef.current = url
-              videoRef.current!.src = url
-              videoRef.current!.currentTime = nextSeg.inPoint
-              videoRef.current!.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
-              videoRef.current!.playbackRate = nextSeg.speed ?? 1
-              videoRef.current!.muted = nextSeg.muted ?? false
+              video.src = url
+              video.currentTime = nextSeg.inPoint
+              video.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
+              video.playbackRate = nextSeg.speed ?? 1
+              video.muted = nextSeg.muted ?? false
               playAbortRef.current = { cancelled: false }
-              cancelPlayRef.current = playWhenReady(videoRef.current!, () => setIsPlaying(false), playAbortRef.current)
+              cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
             }
             activeSegRef.current = nextSeg
           } else {
@@ -316,10 +429,6 @@ export interface AudioOnlyTickParams {
   setIsPlaying: (playing: boolean) => void
 }
 
-// startAudioOnlyTick — RAF loop for audio-only timelines.
-// Supports multi-segment playback: transitions to the next audio segment at boundary.
-// Mutually exclusive with startVideoTick — never run both simultaneously.
-// Returns a cleanup function.
 export function startAudioOnlyTick(params: AudioOnlyTickParams): () => void {
   const {
     audioRef, rafRef, cancelPlayRef, playAbortRef,
@@ -351,7 +460,7 @@ export function startAudioOnlyTick(params: AudioOnlyTickParams): () => void {
           audioUrlRef.current = url
           audioRef.current.src = url
           audioRef.current.currentTime = nextSeg.inPoint
-          audioRef.current.volume = (nextSeg.volume ?? 1) * masterVolumeRef.current
+          audioRef.current.volume = Math.min(1, (nextSeg.volume ?? 1) * masterVolumeRef.current)
           playAbortRef.current = { cancelled: false }
           cancelPlayRef.current = playWhenReady(audioRef.current, () => setIsPlaying(false), playAbortRef.current)
           currentSegRef.current = nextSeg

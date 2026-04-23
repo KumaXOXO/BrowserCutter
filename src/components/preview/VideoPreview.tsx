@@ -201,6 +201,8 @@ export default function VideoPreview() {
     const aIdx = new Set(tracksRef.current.filter((t) => t.type === 'audio' && !t.muted).map((t) => t.trackIndex))
 
     let startSeg = activeSeg
+    let gapInitialTarget: Segment | null = null
+
     if (startSeg?.hidden) {
       const nextVisible = segmentsRef.current
         .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline >= startSeg!.startOnTimeline)
@@ -210,13 +212,13 @@ export default function VideoPreview() {
     }
 
     if (!startSeg) {
-      // No video segment at playhead — find first visible video segment on timeline
-      const firstVideoSeg = [...segmentsRef.current]
-        .filter((s) => vIdx.has(s.trackIndex) && !s.hidden)
+      // Find the next visible video segment at or after the current playhead position
+      const nextVideoSeg = [...segmentsRef.current]
+        .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline >= playheadPosition - 0.001)
         .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
 
-      if (!firstVideoSeg) {
-        // No video at all — try audio-only path
+      if (!nextVideoSeg) {
+        // No video at or after playhead — try audio-only path
         const firstAudioSeg = [...segmentsRef.current]
           .filter((s) => aIdx.has(s.trackIndex))
           .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
@@ -253,9 +255,9 @@ export default function VideoPreview() {
           setPlayheadPosition,
           setIsPlaying,
         })
-      } else {
-        // Image clips don't use the video element for playback — skip play setup
-        const clip = clipsRef.current.find((c) => c.id === firstVideoSeg.clipId)
+      } else if (nextVideoSeg.startOnTimeline <= playheadPosition + 0.001) {
+        // Playhead is at the segment start — load and play normally
+        const clip = clipsRef.current.find((c) => c.id === nextVideoSeg.clipId)
         if (clip?.type !== 'image') {
           if (!video) { setIsPlaying(false); return }
           if (!clip?.file) { setIsPlaying(false); return }
@@ -263,15 +265,41 @@ export default function VideoPreview() {
           const url = URL.createObjectURL(clip.file)
           objectUrlRef.current = url
           video.src = url
-          video.currentTime = firstVideoSeg.inPoint
-          video.volume = Math.min(1, (firstVideoSeg.volume ?? 1) * masterVolumeRef.current)
-          video.playbackRate = firstVideoSeg.speed ?? 1
-          video.muted = firstVideoSeg.muted ?? false
+          video.currentTime = nextVideoSeg.inPoint
+          video.volume = Math.min(1, (nextVideoSeg.volume ?? 1) * masterVolumeRef.current)
+          video.playbackRate = nextVideoSeg.speed ?? 1
+          video.muted = nextVideoSeg.muted ?? false
         }
-        activeSegRef.current = firstVideoSeg
-        setPlayheadPosition(firstVideoSeg.startOnTimeline)
-        startSeg = firstVideoSeg
+        activeSegRef.current = nextVideoSeg
+        setPlayheadPosition(nextVideoSeg.startOnTimeline)
+        startSeg = nextVideoSeg
+      } else {
+        // Playhead is in a gap before nextVideoSeg — start tick in gap mode (shows black screen)
+        if (video) { video.removeAttribute('src'); video.load() }
+        activeSegRef.current = null
+        gapInitialTarget = nextVideoSeg
       }
+    }
+
+    const tickParams = {
+      videoRef,
+      audioRef,
+      segmentsRef,
+      clipsRef,
+      tracksRef,
+      activeSegRef,
+      objectUrlRef,
+      stallCountRef,
+      rafRef,
+      cancelPlayRef,
+      playAbortRef,
+      masterVolumeRef,
+      transitionVideoRef,
+      transitionUrlRef,
+      transitionsRef,
+      loopRegionRef,
+      setPlayheadPosition,
+      setIsPlaying,
     }
 
     if (startSeg) {
@@ -287,26 +315,13 @@ export default function VideoPreview() {
       if (activeAudioSegRef.current && audioRef.current.src) {
         audioRef.current.play().catch(() => {})
       }
-      startVideoTick({
-        videoRef,
-        audioRef,
-        segmentsRef,
-        clipsRef,
-        tracksRef,
-        activeSegRef,
-        objectUrlRef,
-        stallCountRef,
-        rafRef,
-        cancelPlayRef,
-        playAbortRef,
-        masterVolumeRef,
-        transitionVideoRef,
-        transitionUrlRef,
-        transitionsRef,
-        loopRegionRef,
-        setPlayheadPosition,
-        setIsPlaying,
-      })
+      startVideoTick(tickParams)
+    } else if (gapInitialTarget) {
+      // Gap mode: tick advances playhead via real clock until gapInitialTarget.startOnTimeline
+      if (activeAudioSegRef.current && audioRef.current.src) {
+        audioRef.current.play().catch(() => {})
+      }
+      startVideoTick({ ...tickParams, initialGapTarget: gapInitialTarget, initialPlayheadPosition: playheadPosition })
     }
 
     return () => {
