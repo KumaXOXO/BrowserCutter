@@ -10,6 +10,7 @@ const BASE_STYLE = 'position:absolute;inset:0;width:100%;height:100%;object-fit:
 export class ClipVideoPool {
   private entries = new Map<string, PoolEntry>()
   private container: HTMLElement | null = null
+  private objectFit: 'contain' | 'fill' = 'contain'
 
   private static hideElement(el: HTMLVideoElement): void {
     el.style.display = 'none'
@@ -31,6 +32,7 @@ export class ClipVideoPool {
     el.preload = 'auto'
     el.loop = false
     el.style.cssText = BASE_STYLE
+    el.style.objectFit = this.objectFit
     el.src = getClipUrl(clipId, file)
     this.container?.appendChild(el)
     this.entries.set(clipId, { clipId, element: el })
@@ -91,6 +93,13 @@ export class ClipVideoPool {
   clearAllFilters(): void {
     for (const entry of this.entries.values()) {
       entry.element.style.filter = ''
+    }
+  }
+
+  setObjectFit(fit: 'contain' | 'fill'): void {
+    this.objectFit = fit
+    for (const entry of this.entries.values()) {
+      entry.element.style.objectFit = fit
     }
   }
 

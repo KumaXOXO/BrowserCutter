@@ -81,9 +81,29 @@ function SegmentInspector({ segment, clip, onUpdate }: { segment: Segment; clip:
           <InpField value={formatTime(segment.outPoint)} onChange={(v) => onUpdate({ outPoint: parseTime(v) })} />
         </Field>
       </div>
-      <Field label="Duration">
-        <InpField value={formatTime(duration)} readOnly />
-      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Duration">
+          <InpField value={formatTime(duration)} readOnly />
+        </Field>
+        <Field label="Start on Timeline">
+          <InpField value={formatTime(segment.startOnTimeline)} onChange={(v) => { const t = parseTime(v); if (!isNaN(t) && t >= 0) onUpdate({ startOnTimeline: t }) }} />
+        </Field>
+      </div>
+
+      <div style={{ height: 1, background: 'var(--border-subtle)' }} />
+
+      <div className="flex items-center gap-3">
+        <ToggleField
+          label="Muted"
+          on={segment.muted ?? false}
+          onChange={(v) => onUpdate({ muted: v })}
+        />
+        <ToggleField
+          label="Hidden"
+          on={segment.hidden ?? false}
+          onChange={(v) => onUpdate({ hidden: v })}
+        />
+      </div>
 
       <div style={{ height: 1, background: 'var(--border-subtle)' }} />
 
@@ -342,4 +362,23 @@ function parseTime(str: string): number {
   const parts = str.split(':')
   if (parts.length !== 3) return 0
   return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])
+}
+
+function ToggleField({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      className="flex items-center gap-1.5 cursor-pointer transition-all"
+      style={{
+        background: on ? 'rgba(225,29,72,0.1)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${on ? 'rgba(225,29,72,0.45)' : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: 5, padding: '4px 8px',
+        color: on ? '#F43F5E' : 'var(--muted2)',
+        fontSize: 11, fontWeight: 600,
+      }}
+    >
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: on ? '#F43F5E' : 'var(--muted-subtle)', display: 'inline-block', flexShrink: 0 }} />
+      {label}
+    </button>
+  )
 }

@@ -115,6 +115,12 @@ export default function SettingsPanel() {
             onChange={(v) => updateProjectSettings({ fullWidthTimeline: v })}
           />
         </SettingRow>
+        <SettingRow label="Stretch to Format" sub="Stretch portrait video to fill frame">
+          <Toggle
+            on={projectSettings.stretchToFormat ?? false}
+            onChange={(v) => updateProjectSettings({ stretchToFormat: v })}
+          />
+        </SettingRow>
       </div>
     </div>
   )

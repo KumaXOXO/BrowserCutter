@@ -27,7 +27,7 @@ const TRANSITION_SYMBOLS: Record<string, string> = {
 }
 
 export default function ClipBlock({ segment, clip, zoom }: Props) {
-  const { selectedElement, setSelectedElement, updateSegment, updateSegmentLive, updateSegmentsLive, pushHistory, splitSegment, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, timelineMode, resizeEnabled, playheadPosition } = useAppStore()
+  const { selectedElement, setSelectedElement, updateSegment, updateSegmentLive, updateSegmentsLive, pushHistory, splitSegment, splitSegmentGrid, addTransition, removeTransition, projectSettings, transitions, selectedSegmentIds, setSelectedSegmentIds, toggleSegmentSelection, segments, timelineMode, resizeEnabled, cutSubMode, cutGridParts } = useAppStore()
   const showThumbnails = projectSettings.showClipThumbnails ?? false
   const transitionAfter = transitions.find((t) => t.beforeSegmentId === segment.id && t.type !== 'cut')
   const isSelected = selectedElement?.id === segment.id
@@ -37,6 +37,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
   const width = (segment.outPoint - segment.inPoint) / Math.max(0.01, segment.speed ?? 1) * px
 
   const [hovered, setHovered] = useState(false)
+  const [cutHoverX, setCutHoverX] = useState<number | null>(null)
 
   const bgIndex = clip.id.charCodeAt(0) % CLIP_GRADIENTS.length
   const bg = clip.type === 'audio' ? AUDIO_GRADIENT : CLIP_GRADIENTS[bgIndex]
@@ -70,7 +71,15 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     e.stopPropagation()
 
     if (timelineMode === 'cut') {
-      splitSegment(segment.id, playheadPosition)
+      if (cutSubMode === 'grid') {
+        splitSegmentGrid(segment.id, cutGridParts)
+      } else {
+        const trackContent = (e.currentTarget as HTMLElement).parentElement!
+        const trackRect = trackContent.getBoundingClientRect()
+        const scrollLeft = (trackContent.closest('.overflow-auto') as HTMLElement | null)?.scrollLeft ?? 0
+        const clickTime = Math.max(0, (e.clientX - trackRect.left + scrollLeft) / px)
+        splitSegment(segment.id, clickTime)
+      }
       return
     }
 
@@ -112,7 +121,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     // Normal click: single select and drag (with cross-timeline track detection)
     const multiIds = selectedSegmentIds.includes(segment.id) ? selectedSegmentIds : [segment.id]
     setSelectedElement({ type: 'segment', id: segment.id })
-    setSelectedSegmentIds([])
+    // Keep multi-selection visible during and after drag
 
     // Push one undo snapshot before drag begins (not inside mousemove to avoid flooding)
     pushHistory()
@@ -148,12 +157,19 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       document.dispatchEvent(new CustomEvent('bc:drag-track', { detail: targetTrackIndex !== null ? { trackIndex: targetTrackIndex, clipType: clip.type } : null }))
 
       if (multiIds.length > 1) {
-        // Multi-select: only change startOnTimeline, preserve each clip's original track.
-        // Prevents all clips from collapsing to one track on a simple click+move.
-        const patches = multiIds.map((id) => ({
-          id,
-          patch: { startOnTimeline: Math.max(0, (startPositions[id] ?? 0) + primaryDelta) } as Partial<Segment>,
-        }))
+        // Multi-select: horizontal only — preserve each clip's original track.
+        // When clips from multiple rows are selected, vertical movement is blocked entirely.
+        const selectedSegs = useAppStore.getState().segments.filter((s) => multiIds.includes(s.id))
+        const multiRowDrag = new Set(selectedSegs.map((s) => s.trackIndex)).size > 1
+        const patches = multiIds.map((id) => {
+          const seg = selectedSegs.find((s) => s.id === id)
+          const patch: Partial<Segment> = { startOnTimeline: Math.max(0, (startPositions[id] ?? 0) + primaryDelta) }
+          if (!multiRowDrag && seg && targetTrackIndex !== null && targetTrackType !== null) {
+            if ((clip.type === 'video' || clip.type === 'image') && targetTrackType === 'video') patch.trackIndex = targetTrackIndex
+            else if (clip.type === 'audio' && targetTrackType === 'audio') patch.trackIndex = targetTrackIndex
+          }
+          return { id, patch }
+        })
         updateSegmentsLive(patches)
       } else {
         const patchSingle: Partial<typeof segment> = { startOnTimeline: newStart }
@@ -288,25 +304,32 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     }
   }
 
+  const handleCutMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (timelineMode !== 'cut' || cutSubMode !== 'free') { setCutHoverX(null); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setCutHoverX(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)))
+  }
+
   return (
     <div
       onMouseDown={handleBodyMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setCutHoverX(null) }}
+      onMouseMove={handleCutMouseMove}
       style={{
         position: 'absolute',
         top: 4, bottom: 4,
         left, width,
         borderRadius: 5,
-        background: bg,
+        background: showThumbnails && clip.type !== 'audio' ? 'transparent' : bg,
         cursor: timelineMode === 'playhead' ? 'default' : timelineMode === 'cut' ? 'crosshair' : 'grab',
         userSelect: 'none',
         display: 'flex',
         alignItems: 'center',
         overflow: 'hidden',
-        outline: (isSelected || isMultiSelected) ? '2px solid #F43F5E' : 'none',
+        outline: (isSelected || isMultiSelected) ? '2px solid #F43F5E' : showThumbnails && clip.type !== 'audio' ? '1.5px solid rgba(255,255,255,0.7)' : 'none',
         outlineOffset: 1,
         opacity: segment.hidden ? 0.4 : 1,
         filter: hovered && !isSelected ? 'brightness(1.2)' : undefined,
@@ -334,13 +357,15 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         />
       )}
 
-      <span style={{
-        fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)',
-        padding: '0 12px', whiteSpace: 'nowrap', letterSpacing: 0.3,
-        pointerEvents: 'none', zIndex: 1,
-      }}>
-        {label}
-      </span>
+      {!(showThumbnails && clip.type !== 'audio') && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)',
+          padding: '0 12px', whiteSpace: 'nowrap', letterSpacing: 0.3,
+          pointerEvents: 'none', zIndex: 1,
+        }}>
+          {label}
+        </span>
+      )}
 
       {/* Missing file badge — shown when clip has no file (after project load) */}
       {!clip.file && (
@@ -388,6 +413,20 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
             borderRadius: '0 5px 5px 0',
           }}
         />
+      )}
+
+      {/* Cut mode hover indicator */}
+      {timelineMode === 'cut' && hovered && cutSubMode === 'free' && cutHoverX !== null && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}>
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${cutHoverX * 100}%`, width: 1.5, background: 'rgba(255,255,255,0.85)', boxShadow: '0 0 4px rgba(255,255,255,0.5)' }} />
+        </div>
+      )}
+      {timelineMode === 'cut' && hovered && cutSubMode === 'grid' && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}>
+          {Array.from({ length: cutGridParts - 1 }, (_, i) => (
+            <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${((i + 1) / cutGridParts) * 100}%`, width: 1.5, background: 'rgba(255,255,255,0.75)', boxShadow: '0 0 4px rgba(255,255,255,0.4)' }} />
+          ))}
+        </div>
       )}
     </div>
   )

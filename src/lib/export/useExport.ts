@@ -111,7 +111,9 @@ export function useExport(): ExportState {
         ;(async () => {
           const filename = await getUniqueExportFilename(baseName, ext)
           const saved = await writeExportFile(msg.buffer, filename).catch(() => false)
-          if (!saved) downloadBuffer(msg.buffer, `${baseName}.${ext}`)
+          if (!saved) {
+            await saveWithPickerOrDownload(msg.buffer, `${baseName}.${ext}`, ext)
+          }
           workerRef.current = null
         })()
       } else if (msg.type === 'error') {
@@ -157,4 +159,25 @@ function downloadBuffer(buffer: ArrayBuffer, filename: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+async function saveWithPickerOrDownload(buffer: ArrayBuffer, filename: string, ext: string): Promise<void> {
+  if (!('showSaveFilePicker' in window)) {
+    downloadBuffer(buffer, filename)
+    return
+  }
+  try {
+    const handle = await (window as Window & { showSaveFilePicker: (opts: Record<string, unknown>) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: `${ext.toUpperCase()} Video`, accept: { [`video/${ext}`]: [`.${ext}`] } }],
+    })
+    const writable = await handle.createWritable()
+    await writable.write(buffer)
+    await writable.close()
+  } catch (err) {
+    if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'SecurityError')) {
+      // User cancelled or picker unavailable — fall back to auto-download
+      downloadBuffer(buffer, filename)
+    }
+  }
 }

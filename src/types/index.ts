@@ -108,6 +108,7 @@ export interface ProjectSettings {
   customHeight?: number
   customFps?: number
   fullWidthTimeline?: boolean
+  stretchToFormat?: boolean
 }
 
 export type SelectedElementType = 'segment' | 'adjustment' | 'text' | 'transition' | null

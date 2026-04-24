@@ -43,6 +43,7 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
     playheadPosition, setPlayheadPosition,
     tracks, updateTrack, removeTrack, moveTrack,
     timelineMode, resizeEnabled, setTimelineMode, setResizeEnabled,
+    cutSubMode, cutGridParts, setCutSubMode, setCutGridParts,
     projectSettings, updateProjectSettings,
     bpmConfig, updateBpmConfig,
   } = useAppStore()
@@ -64,6 +65,17 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const store = useAppStore.getState()
       const { selectedSegmentIds, selectedElement, segments, setSelectedSegmentIds, setSelectedElement, removeSegments, removeTextOverlay, removeAdjustmentLayer } = store
+
+      // P: toggle preview fullscreen
+      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        const previewEl = document.querySelector('[data-preview-container]') as HTMLElement | null
+        if (previewEl) {
+          if (!document.fullscreenElement) previewEl.requestFullscreen().catch(() => {})
+          else document.exitFullscreen().catch(() => {})
+        }
+        return
+      }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const toDelete = new Set(selectedSegmentIds)
@@ -105,6 +117,17 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         const anchor = segments.find((s) => s.id === anchorId)
         if (anchor) {
           setSelectedSegmentIds(segments.filter((s) => s.trackIndex === anchor.trackIndex).map((s) => s.id))
+        }
+        return
+      }
+
+      // Alt+A: select all clips that share the same source video as the current selection
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault()
+        const anchorId = selectedElement?.id ?? selectedSegmentIds[selectedSegmentIds.length - 1]
+        const anchor = segments.find((s) => s.id === anchorId)
+        if (anchor) {
+          setSelectedSegmentIds(segments.filter((s) => s.clipId === anchor.clipId).map((s) => s.id))
         }
         return
       }
@@ -210,6 +233,53 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         style={{ height: 30, background: 'var(--surface)', borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center gap-2 relative">
+          {/* Cut sub-mode controls — visible when cut mode is active */}
+          {timelineMode === 'cut' && (
+            <div className="flex items-center gap-1" style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 6 }}>
+              <button
+                title="Free cut — click anywhere on a clip to split at that point"
+                onClick={() => setCutSubMode('free')}
+                className="text-xs rounded cursor-pointer transition-all duration-150"
+                style={{
+                  padding: '2px 6px', fontWeight: 600,
+                  color: cutSubMode === 'free' ? '#F43F5E' : 'var(--muted2)',
+                  background: cutSubMode === 'free' ? 'rgba(225,29,72,0.1)' : 'transparent',
+                  border: `1px solid ${cutSubMode === 'free' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
+                }}
+              >
+                FREE
+              </button>
+              <button
+                title="Grid cut — split clip into equal parts"
+                onClick={() => setCutSubMode('grid')}
+                className="text-xs rounded cursor-pointer transition-all duration-150"
+                style={{
+                  padding: '2px 6px', fontWeight: 600,
+                  color: cutSubMode === 'grid' ? '#F43F5E' : 'var(--muted2)',
+                  background: cutSubMode === 'grid' ? 'rgba(225,29,72,0.1)' : 'transparent',
+                  border: `1px solid ${cutSubMode === 'grid' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
+                }}
+              >
+                GRID
+              </button>
+              {cutSubMode === 'grid' && (
+                <input
+                  type="number"
+                  min={2}
+                  max={64}
+                  value={cutGridParts}
+                  title="Number of equal parts (2–64)"
+                  onChange={(e) => setCutGridParts(Number(e.target.value))}
+                  style={{
+                    width: 42, fontSize: 10, textAlign: 'center',
+                    background: 'transparent', border: '1px solid var(--border-subtle)',
+                    color: 'var(--muted2)', borderRadius: 4, padding: '2px 4px', outline: 'none',
+                  }}
+                />
+              )}
+            </div>
+          )}
+
           <button
             title={projectSettings.snapToBeat ? 'Snap: Grid — clips snap to beat. Click for Free.' : 'Snap: Free — clips move freely. Click for Grid.'}
             onClick={() => updateProjectSettings({ snapToBeat: !projectSettings.snapToBeat })}

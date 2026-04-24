@@ -105,8 +105,13 @@ interface AppState {
   // ─── Timeline mode ───
   timelineMode: 'playhead' | 'selection' | 'cut'
   resizeEnabled: boolean
+  cutSubMode: 'free' | 'grid'
+  cutGridParts: number
   setTimelineMode: (mode: 'playhead' | 'selection' | 'cut') => void
   setResizeEnabled: (enabled: boolean) => void
+  setCutSubMode: (mode: 'free' | 'grid') => void
+  setCutGridParts: (n: number) => void
+  splitSegmentGrid: (id: SegmentId, parts: number) => void
 
   undo: () => void
   redo: () => void
@@ -189,10 +194,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ─── Timeline mode ───
   timelineMode: 'selection',
   resizeEnabled: false,
+  cutSubMode: 'free',
+  cutGridParts: 2,
 
   // ─── Actions ───
   setTimelineMode: (mode) => set({ timelineMode: mode, resizeEnabled: (mode === 'playhead' || mode === 'cut') ? false : get().resizeEnabled }),
   setResizeEnabled: (enabled) => set((s) => ({ resizeEnabled: s.timelineMode === 'selection' ? enabled : false })),
+  setCutSubMode: (mode) => set({ cutSubMode: mode }),
+  setCutGridParts: (n) => set({ cutGridParts: Math.min(64, Math.max(2, n)) }),
+  splitSegmentGrid: (id, parts) => set((s) => {
+    const seg = s.segments.find((x) => x.id === id)
+    if (!seg) return s
+    const speed = Math.max(0.01, seg.speed ?? 1)
+    const dur = (seg.outPoint - seg.inPoint) / speed
+    const partDur = dur / parts
+    if (partDur < 0.033) return s
+    const updatedOrig = { ...seg, outPoint: seg.inPoint + partDur * speed }
+    const newSegs: Segment[] = []
+    for (let i = 1; i < parts; i++) {
+      const startOnTimeline = seg.startOnTimeline + i * partDur
+      const inPoint = seg.inPoint + i * partDur * speed
+      newSegs.push({
+        ...seg,
+        id: crypto.randomUUID(),
+        inPoint,
+        outPoint: i < parts - 1 ? inPoint + partDur * speed : seg.outPoint,
+        startOnTimeline,
+      })
+    }
+    const updated = s.segments.map((x) => x.id === id ? updatedOrig : x)
+    return { ...push(s), segments: [...updated, ...newSegs] }
+  }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMediaSubTab: (tab) => set({ mediaSubTab: tab }),

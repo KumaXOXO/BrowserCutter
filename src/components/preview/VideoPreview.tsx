@@ -1,6 +1,6 @@
 // src/components/preview/VideoPreview.tsx
 import { useRef, useEffect, useMemo, useState } from 'react'
-import { Film } from 'lucide-react'
+import { Film, Maximize2 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatTime } from '../../lib/utils'
 import TextOverlayRenderer from './TextOverlayRenderer'
@@ -13,9 +13,10 @@ export default function VideoPreview() {
   const {
     segments, clips, tracks, playheadPosition, isPlaying,
     setPlayheadPosition, setIsPlaying,
-    masterVolume, transitions, loopRegion,
+    masterVolume, transitions, loopRegion, projectSettings,
   } = useAppStore()
 
+  const previewContainerRef = useRef<HTMLDivElement>(null)
   const poolRef = useRef<ClipVideoPool | null>(null)
   const poolContainerRef = useRef<HTMLDivElement>(null)
   const activeClipIdRef = useRef<string | null>(null)
@@ -60,6 +61,10 @@ export default function VideoPreview() {
     const activeIds = new Set(clips.map((c) => c.id))
     pool.syncToClips(activeIds)
   }, [clips])
+
+  useEffect(() => {
+    poolRef.current?.setObjectFit(projectSettings.stretchToFormat ? 'fill' : 'contain')
+  }, [projectSettings.stretchToFormat])
 
   const videoTrackIdx = useMemo(
     () => new Set(tracks.filter((t) => t.type === 'video' && !t.hidden).map((t) => t.trackIndex)),
@@ -326,11 +331,23 @@ export default function VideoPreview() {
     }
   }, [isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const toggleFullscreen = () => {
+    const el = previewContainerRef.current
+    if (!el) return
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }
+
   const hasSegments = segments.length > 0
 
   return (
     <div className="flex flex-1 items-center justify-center min-h-0" style={{ background: '#05050C', padding: 20 }}>
       <div
+        ref={previewContainerRef}
+        data-preview-container
         className="relative flex items-center justify-center"
         style={{
           aspectRatio: '16/9',
@@ -351,7 +368,8 @@ export default function VideoPreview() {
           <img
             src={imgUrl}
             style={{
-              position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: projectSettings.stretchToFormat ? 'fill' : 'contain',
               filter: buildCSSFilter(activeSeg?.effects ?? []) || undefined,
             }}
             alt=""
@@ -386,9 +404,22 @@ export default function VideoPreview() {
             </div>
           </div>
         )}
+        <button
+          onClick={toggleFullscreen}
+          title="Fullscreen preview (P)"
+          style={{
+            position: 'absolute', bottom: 10, right: 10,
+            background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 4, cursor: 'pointer', color: 'rgba(255,255,255,0.6)',
+            padding: '3px 5px', display: 'flex', alignItems: 'center',
+            backdropFilter: 'blur(4px)', zIndex: 10,
+          }}
+        >
+          <Maximize2 size={11} />
+        </button>
         <div
           className="absolute text-xs font-mono"
-          style={{ bottom: 10, right: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(4px)' }}
+          style={{ bottom: 10, right: 36, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(4px)' }}
         >
           {formatTime(playheadPosition)}
         </div>
