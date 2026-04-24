@@ -6,5 +6,12 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     headless: true,
+    launchOptions: {
+      args: [
+        '--autoplay-policy=no-user-gesture-required',
+        '--disable-background-media-suspend',
+        '--disable-backgrounding-occluded-windows',
+      ],
+    },
   },
 })

@@ -5,7 +5,8 @@ import { useAppStore } from '../../store/useAppStore'
 import { formatTime } from '../../lib/utils'
 import TextOverlayRenderer from './TextOverlayRenderer'
 import { buildCSSFilter, hasVignette, vignetteOpacity } from '../../lib/video/effectsFilter'
-import { playWhenReady, startVideoTick, startAudioOnlyTick } from '../../lib/video/playbackEngine'
+import { playWhenReady, startVideoTick, startAudioOnlyTick, getClipUrl } from '../../lib/video/playbackEngine'
+import { ClipVideoPool } from '../../lib/video/videoPool'
 import type { Segment } from '../../types'
 
 export default function VideoPreview() {
@@ -15,8 +16,9 @@ export default function VideoPreview() {
     masterVolume, transitions, loopRegion,
   } = useAppStore()
 
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const objectUrlRef = useRef<string | null>(null)
+  const poolRef = useRef<ClipVideoPool | null>(null)
+  const poolContainerRef = useRef<HTMLDivElement>(null)
+  const activeClipIdRef = useRef<string | null>(null)
   const rafRef = useRef<number>(0)
   const stallCountRef = useRef(0)
   const activeSegRef = useRef<Segment | null>(null)
@@ -31,9 +33,6 @@ export default function VideoPreview() {
 
   const [imgUrl, setImgUrl] = useState<string | null>(null)
 
-  const transitionVideoRef = useRef<HTMLVideoElement>(null)
-  const transitionUrlRef = useRef<string | null>(null)
-
   const tracksRef = useRef(tracks)
   tracksRef.current = tracks
 
@@ -47,6 +46,20 @@ export default function VideoPreview() {
   clipsRef.current = clips
   masterVolumeRef.current = masterVolume
   transitionsRef.current = transitions
+
+  useEffect(() => {
+    const pool = new ClipVideoPool()
+    poolRef.current = pool
+    if (poolContainerRef.current) pool.attach(poolContainerRef.current)
+    return () => { pool.destroy(); poolRef.current = null }
+  }, [])
+
+  useEffect(() => {
+    const pool = poolRef.current
+    if (!pool) return
+    const activeIds = new Set(clips.map((c) => c.id))
+    pool.syncToClips(activeIds)
+  }, [clips])
 
   const videoTrackIdx = useMemo(
     () => new Set(tracks.filter((t) => t.type === 'video' && !t.hidden).map((t) => t.trackIndex)),
@@ -63,7 +76,6 @@ export default function VideoPreview() {
         playheadPosition >= s.startOnTimeline &&
         playheadPosition < s.startOnTimeline + (s.outPoint - s.inPoint) / Math.max(0.01, s.speed ?? 1),
     )
-    // Sort by track array position: lower index (top of UI stack) wins
     return candidates.sort((a, b) => {
       const aPos = tracks.findIndex((t) => t.trackIndex === a.trackIndex)
       const bPos = tracks.findIndex((t) => t.trackIndex === b.trackIndex)
@@ -71,7 +83,6 @@ export default function VideoPreview() {
     })[0] ?? null
   }, [segments, playheadPosition, videoTrackIdx, tracks])
   const activeClip = activeSeg ? clips.find((c) => c.id === activeSeg.clipId) ?? null : null
-  // Only update ref while paused — RAF tick owns this ref during playback to avoid overwrite race
   if (!isPlaying) activeSegRef.current = activeSeg
 
   const activeAudioSeg = useMemo(() => segments.find(
@@ -84,14 +95,12 @@ export default function VideoPreview() {
 
   const isImageClip = activeClip?.type === 'image'
 
-  // Compute fade overlay opacity — checks transitions around current playhead
   const fadeOverlayOpacity = useMemo(() => {
     if (!activeSeg) return 0
     const segDuration = (activeSeg.outPoint - activeSeg.inPoint) / Math.max(0.01, activeSeg.speed ?? 1)
     const segEnd = activeSeg.startOnTimeline + segDuration
     const posInSeg = playheadPosition - activeSeg.startOnTimeline
 
-    // Check transition after this segment (fade out at end)
     const transAfter = transitions.find((t) => t.afterSegmentId === activeSeg.id && t.type === 'fade')
     if (transAfter && transAfter.duration > 0) {
       const fadeStart = segEnd - transAfter.duration
@@ -100,7 +109,6 @@ export default function VideoPreview() {
       }
     }
 
-    // Check transition before this segment (fade in at start)
     const transBefore = transitions.find((t) => t.beforeSegmentId === activeSeg.id && t.type === 'fade')
     if (transBefore && transBefore.duration > 0 && posInSeg < transBefore.duration) {
       return Math.max(0, 1 - posInSeg / transBefore.duration)
@@ -109,27 +117,21 @@ export default function VideoPreview() {
     return 0
   }, [activeSeg, playheadPosition, transitions])
 
-  // Load video object URL when clip changes (only when not playing, skip image clips)
+  // Load video into pool when clip changes (paused state only)
   useEffect(() => {
     if (isPlaying) return
-    const video = videoRef.current
-    if (!video) return
-    if (!activeClip?.file || activeClip.type === 'image') { video.load(); return }
-    const url = URL.createObjectURL(activeClip.file)
-    objectUrlRef.current = url
-    video.src = url
-    // Cleanup: clear src and abort load BEFORE revoking so the browser never tries to fetch
-    // a revoked URL. Guards against isPlaying so the RAF tick keeps ownership during playback.
-    return () => {
-      if (useAppStore.getState().isPlaying) return
-      const vid = videoRef.current
-      if (vid) { vid.removeAttribute('src'); vid.load() }
-      URL.revokeObjectURL(url)
-      if (objectUrlRef.current === url) objectUrlRef.current = null
+    const pool = poolRef.current
+    if (!pool || !activeClip?.file || activeClip.type === 'image') {
+      pool?.hideAll()
+      return
     }
+    pool.ensure(activeClip.id, activeClip.file)
+    pool.showOnly(activeClip.id)
+    activeClipIdRef.current = activeClip.id
+    pool.applyFilter(activeClip.id, buildCSSFilter(activeSeg?.effects ?? []) || '')
   }, [activeClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load image blob URL for image clips — must be state (not ref) to trigger re-render
+  // Load image blob URL for image clips
   useEffect(() => {
     if (!activeClip?.file || activeClip.type !== 'image') { setImgUrl(null); return }
     const url = URL.createObjectURL(activeClip.file)
@@ -137,27 +139,28 @@ export default function VideoPreview() {
     return () => URL.revokeObjectURL(url)
   }, [activeClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load audio object URL when audio clip changes (only when not playing)
+  // Load audio object URL when audio clip changes (paused state only)
   useEffect(() => {
     if (isPlaying) return
     const audio = audioRef.current
     if (!activeAudioClip?.file) { audio.removeAttribute('src'); audio.load(); return }
-    const url = URL.createObjectURL(activeAudioClip.file)
+    const url = getClipUrl(activeAudioClip.id, activeAudioClip.file)
     audioUrlRef.current = url
     audio.src = url
     return () => {
       const aud = audioRef.current
       if (aud) { aud.removeAttribute('src'); aud.load() }
-      URL.revokeObjectURL(url)
       if (audioUrlRef.current === url) audioUrlRef.current = null
     }
   }, [activeAudioClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Seek video when playhead moves while paused
   useEffect(() => {
-    const video = videoRef.current
+    const pool = poolRef.current
     const seg = activeSegRef.current
-    if (isPlaying || !video || !seg) return
+    if (isPlaying || !pool || !seg) return
+    const video = pool.get(activeClipIdRef.current)
+    if (!video) return
     video.currentTime = seg.inPoint + (playheadPosition - seg.startOnTimeline) * (seg.speed ?? 1)
   }, [playheadPosition]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -169,43 +172,54 @@ export default function VideoPreview() {
     audio.currentTime = seg.inPoint + (playheadPosition - seg.startOnTimeline)
   }, [playheadPosition]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply volume (with masterVolume), playbackRate, and muted to video when active segment changes
+  // Apply volume, playbackRate, muted when active segment changes (paused)
   useEffect(() => {
-    const video = videoRef.current
-    if (!video || !activeSeg) return
+    const pool = poolRef.current
+    if (!pool || !activeSeg) return
+    const video = pool.get(activeClipIdRef.current)
+    if (!video) return
     video.volume = Math.min(1, (activeSeg.volume ?? 1) * masterVolume)
     video.playbackRate = activeSeg.speed ?? 1
     video.muted = activeSeg.muted ?? false
   }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed, activeSeg?.muted, masterVolume]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply volume (with masterVolume) to audio element when active audio segment changes
+  // Apply volume to audio element
   useEffect(() => {
     if (!activeAudioSeg) return
     audioRef.current.volume = Math.min(1, (activeAudioSeg.volume ?? 1) * masterVolume)
   }, [activeAudioSeg?.id, activeAudioSeg?.volume, masterVolume]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply CSS filter when effects change (paused)
+  useEffect(() => {
+    const pool = poolRef.current
+    if (!pool || !activeSeg || isPlaying) return
+    pool.clearAllFilters()
+    const clipId = activeClipIdRef.current
+    if (clipId) pool.applyFilter(clipId, buildCSSFilter(activeSeg.effects ?? []) || '')
+  }, [activeSeg?.effects]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // RAF playback loop
   useEffect(() => {
-    const video = videoRef.current
+    const pool = poolRef.current
 
     if (!isPlaying) {
       cancelAnimationFrame(rafRef.current)
-      video?.pause()
+      pool?.pauseAll()
       audioRef.current.pause()
       return
     }
+
+    if (!pool) { setIsPlaying(false); return }
 
     playAbortRef.current = { cancelled: false }
     stallCountRef.current = 0
     let audioOnlyCleanup = () => {}
 
-    // If loop region active and playhead is outside it, jump to loop start
     const lr = loopRegionRef.current
     if (lr && (playheadPosition < lr.start || playheadPosition >= lr.end)) {
       setPlayheadPosition(lr.start)
     }
 
-    // Resolve the starting video segment (skip hidden segments)
     const vIdx = new Set(tracksRef.current.filter((t) => t.type === 'video' && !t.hidden).map((t) => t.trackIndex))
     const aIdx = new Set(tracksRef.current.filter((t) => t.type === 'audio' && !t.muted).map((t) => t.trackIndex))
 
@@ -221,26 +235,20 @@ export default function VideoPreview() {
     }
 
     if (!startSeg) {
-      // Find the next visible video segment at or after the current playhead position
       const nextVideoSeg = [...segmentsRef.current]
         .filter((s) => vIdx.has(s.trackIndex) && !s.hidden && s.startOnTimeline >= playheadPosition - 0.001)
         .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
 
       if (!nextVideoSeg) {
-        // No video at or after playhead — try audio-only path
         const firstAudioSeg = [...segmentsRef.current]
           .filter((s) => aIdx.has(s.trackIndex))
           .sort((a, b) => a.startOnTimeline - b.startOnTimeline)[0] ?? null
 
-        if (!firstAudioSeg) {
-          setIsPlaying(false)
-          return
-        }
+        if (!firstAudioSeg) { setIsPlaying(false); return }
 
         const audioClip = clipsRef.current.find((c) => c.id === firstAudioSeg.clipId)
         if (!audioClip?.file) { setIsPlaying(false); return }
-        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
-        const audioUrl = URL.createObjectURL(audioClip.file)
+        const audioUrl = getClipUrl(audioClip.id, audioClip.file)
         audioUrlRef.current = audioUrl
         const audio = audioRef.current
         audio.src = audioUrl
@@ -251,29 +259,17 @@ export default function VideoPreview() {
 
         cancelPlayRef.current = playWhenReady(audio, () => setIsPlaying(false), playAbortRef.current)
         audioOnlyCleanup = startAudioOnlyTick({
-          audioRef,
-          rafRef,
-          cancelPlayRef,
-          playAbortRef,
-          segmentsRef,
-          clipsRef,
-          tracksRef,
-          audioUrlRef,
-          masterVolumeRef,
-          initialSeg: firstAudioSeg,
-          setPlayheadPosition,
-          setIsPlaying,
+          audioRef, rafRef, cancelPlayRef, playAbortRef,
+          segmentsRef, clipsRef, tracksRef, audioUrlRef, masterVolumeRef,
+          initialSeg: firstAudioSeg, setPlayheadPosition, setIsPlaying,
         })
       } else if (nextVideoSeg.startOnTimeline <= playheadPosition + 0.001) {
-        // Playhead is at the segment start — load and play normally
         const clip = clipsRef.current.find((c) => c.id === nextVideoSeg.clipId)
         if (clip?.type !== 'image') {
-          if (!video) { setIsPlaying(false); return }
           if (!clip?.file) { setIsPlaying(false); return }
-          if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
-          const url = URL.createObjectURL(clip.file)
-          objectUrlRef.current = url
-          video.src = url
+          const video = pool.ensure(clip.id, clip.file)
+          pool.showOnly(clip.id)
+          activeClipIdRef.current = clip.id
           video.currentTime = nextVideoSeg.inPoint
           video.volume = Math.min(1, (nextVideoSeg.volume ?? 1) * masterVolumeRef.current)
           video.playbackRate = nextVideoSeg.speed ?? 1
@@ -283,40 +279,27 @@ export default function VideoPreview() {
         setPlayheadPosition(nextVideoSeg.startOnTimeline)
         startSeg = nextVideoSeg
       } else {
-        // Playhead is in a gap before nextVideoSeg — start tick in gap mode (shows black screen)
-        if (video) { video.style.opacity = '0'; video.removeAttribute('src'); video.load() }
+        pool.hideAll()
         activeSegRef.current = null
         gapInitialTarget = nextVideoSeg
       }
     }
 
     const tickParams = {
-      videoRef,
-      audioRef,
-      segmentsRef,
-      clipsRef,
-      tracksRef,
-      activeSegRef,
-      objectUrlRef,
-      stallCountRef,
-      rafRef,
-      cancelPlayRef,
-      playAbortRef,
-      masterVolumeRef,
-      transitionVideoRef,
-      transitionUrlRef,
-      transitionsRef,
-      loopRegionRef,
-      setPlayheadPosition,
-      setIsPlaying,
+      pool, activeClipIdRef,
+      audioRef, segmentsRef, clipsRef, tracksRef, activeSegRef,
+      stallCountRef, rafRef, cancelPlayRef, playAbortRef,
+      masterVolumeRef, transitionsRef, loopRegionRef,
+      setPlayheadPosition, setIsPlaying,
     }
 
     if (startSeg) {
-      if (!video) { setIsPlaying(false); return }
       const startClip = clipsRef.current.find((c) => c.id === startSeg!.clipId)
-      // Only play via video element for non-image clips
-      if (startClip?.type !== 'image') {
-        // Ensure currentTime is at the right position — src reset (Load URL effect) resets it to 0
+      if (startClip?.type !== 'image' && startClip?.file) {
+        const video = pool.ensure(startClip.id, startClip.file)
+        pool.showOnly(startClip.id)
+        activeClipIdRef.current = startClip.id
+        pool.applyFilter(startClip.id, buildCSSFilter(startSeg!.effects ?? []) || '')
         const targetTime = startSeg!.inPoint + (playheadPosition - startSeg!.startOnTimeline) * Math.max(0.01, startSeg!.speed ?? 1)
         if (Math.abs(video.currentTime - targetTime) > 0.05) video.currentTime = targetTime
         cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
@@ -326,7 +309,6 @@ export default function VideoPreview() {
       }
       startVideoTick(tickParams)
     } else if (gapInitialTarget) {
-      // Gap mode: tick advances playhead via real clock until gapInitialTarget.startOnTimeline
       if (activeAudioSegRef.current && audioRef.current.src) {
         audioRef.current.play().catch(() => {})
       }
@@ -338,19 +320,9 @@ export default function VideoPreview() {
       cancelPlayRef.current()
       audioOnlyCleanup()
       cancelAnimationFrame(rafRef.current)
-      videoRef.current?.pause()
+      pool.pauseAll()
+      pool.resetStyles()
       audioRef.current.pause()
-      // Clean up transition B on stop
-      if (transitionUrlRef.current) { URL.revokeObjectURL(transitionUrlRef.current); transitionUrlRef.current = null }
-      if (transitionVideoRef.current) {
-        transitionVideoRef.current.pause()
-        transitionVideoRef.current.src = ''
-        transitionVideoRef.current.style.display = 'none'
-        transitionVideoRef.current.style.opacity = '0'
-        transitionVideoRef.current.style.transform = ''
-        transitionVideoRef.current.style.clipPath = ''
-      }
-      if (videoRef.current) { videoRef.current.style.opacity = '1'; videoRef.current.style.transform = ''; videoRef.current.style.clipPath = '' }
     }
   }, [isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -371,24 +343,10 @@ export default function VideoPreview() {
           boxShadow: '0 0 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)',
         }}
       >
-        <video
-          ref={videoRef}
-          playsInline
-          preload="auto"
-          loop={false}
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000',
-            filter: buildCSSFilter(activeSeg?.effects ?? []) || undefined,
-            display: isImageClip ? 'none' : undefined,
-          }}
+        <div
+          ref={poolContainerRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
         />
-        {/* Transition overlay — second video element for dissolve/wipe/slide/zoom */}
-        <video
-          ref={transitionVideoRef}
-          muted
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'none', opacity: 0 }}
-        />
-        {/* Image clip display */}
         {isImageClip && imgUrl && (
           <img
             src={imgUrl}
@@ -407,7 +365,6 @@ export default function VideoPreview() {
             }}
           />
         )}
-        {/* Fade transition overlay */}
         {fadeOverlayOpacity > 0 && (
           <div
             style={{
