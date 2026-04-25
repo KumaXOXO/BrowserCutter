@@ -60,10 +60,12 @@ function SegmentInspector({ segment, clip, onUpdate }: { segment: Segment; clip:
 
   const [localVolume, setLocalVolume] = useState(Math.round((segment.volume ?? 1) * 100))
   const [localSpeed, setLocalSpeed] = useState(Math.round((segment.speed ?? 1) * 100))
+  const [localRotation, setLocalRotation] = useState(segment.rotation ?? 0)
 
   useEffect(() => {
     setLocalVolume(Math.round((segment.volume ?? 1) * 100))
     setLocalSpeed(Math.round((segment.speed ?? 1) * 100))
+    setLocalRotation(segment.rotation ?? 0)
   }, [segment.id])
 
   return (
@@ -126,6 +128,24 @@ function SegmentInspector({ segment, clip, onUpdate }: { segment: Segment; clip:
           onChange={(e) => setLocalSpeed(Number(e.target.value))}
           onPointerUp={(e) => onUpdate({ speed: Number((e.target as HTMLInputElement).value) / 100 })}
         />
+      </Field>
+      <Field label={`Rotation — ${localRotation}°`}>
+        <div className="flex items-center gap-2">
+          <input
+            type="range" min={-180} max={180}
+            value={localRotation}
+            className="flex-1"
+            style={{ accentColor: '#E11D48' }}
+            onChange={(e) => setLocalRotation(Number(e.target.value))}
+            onPointerUp={(e) => onUpdate({ rotation: Number((e.target as HTMLInputElement).value) })}
+          />
+          <input
+            type="number" min={-180} max={180} step={1}
+            value={localRotation}
+            style={{ width: 52, fontSize: 11, textAlign: 'center', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--muted2)', borderRadius: 4, padding: '2px 4px', outline: 'none' }}
+            onChange={(e) => { const v = Number(e.target.value); setLocalRotation(v); onUpdate({ rotation: v }) }}
+          />
+        </div>
       </Field>
 
       <div style={{ height: 1, background: 'var(--border-subtle)' }} />

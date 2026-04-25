@@ -201,7 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTimelineMode: (mode) => set({ timelineMode: mode, resizeEnabled: (mode === 'playhead' || mode === 'cut') ? false : get().resizeEnabled }),
   setResizeEnabled: (enabled) => set((s) => ({ resizeEnabled: s.timelineMode === 'selection' ? enabled : false })),
   setCutSubMode: (mode) => set({ cutSubMode: mode }),
-  setCutGridParts: (n) => set({ cutGridParts: Math.min(64, Math.max(2, n)) }),
+  setCutGridParts: (n) => set({ cutGridParts: Math.min(128, Math.max(2, n)) }),
   splitSegmentGrid: (id, parts) => set((s) => {
     const seg = s.segments.find((x) => x.id === id)
     if (!seg) return s

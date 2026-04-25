@@ -90,7 +90,10 @@ async function extractFrame(file: File, inPoint: number): Promise<string | null>
   } catch {
     return null
   } finally {
-    if (objectUrl) URL.revokeObjectURL(objectUrl)
+    if (objectUrl) {
+      video.src = ''  // clear before revoke so no dangling reference causes ERR_FILE_NOT_FOUND
+      URL.revokeObjectURL(objectUrl)
+    }
     releaseSlot()
   }
 }

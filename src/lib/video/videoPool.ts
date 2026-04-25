@@ -90,6 +90,11 @@ export class ClipVideoPool {
     if (entry) entry.element.style.filter = filter
   }
 
+  applyTransform(clipId: string, rotation: number): void {
+    const entry = this.entries.get(clipId)
+    if (entry) entry.element.style.transform = rotation ? `rotate(${rotation}deg)` : ''
+  }
+
   clearAllFilters(): void {
     for (const entry of this.entries.values()) {
       entry.element.style.filter = ''

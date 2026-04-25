@@ -30,8 +30,8 @@ function makeDir(projectFh: object, mediaDirFh?: object) {
   }
 }
 
-describe('loadProjectFromDir — no arrayBuffer() on load', () => {
-  it('returns the File from getFile() directly without buffering', async () => {
+describe('loadProjectFromDir — buffers media into RAM at load time', () => {
+  it('returns a memory-backed File (not the FSAPI snapshot) so permissions cannot expire', async () => {
     const fakeFile = new File(['video-data'], 'test.mp4', { type: 'video/mp4', lastModified: 1000 })
     const mediaFileFh = { getFile: vi.fn().mockResolvedValue(fakeFile) }
     const mediaDirFh = { getFileHandle: vi.fn().mockResolvedValue(mediaFileFh) }
@@ -43,8 +43,13 @@ describe('loadProjectFromDir — no arrayBuffer() on load', () => {
 
     expect(result.ok).toBe(true)
     const clips = result.data!.clips as Array<Record<string, unknown>>
-    expect(clips[0].file).toBe(fakeFile)
-    // arrayBuffer() is NOT called during load — no OOM risk for large files
+    const loadedFile = clips[0].file as File
+    // The returned File is a NEW memory-backed object (not the FSAPI snapshot).
+    // FSAPI snapshots lose permission after focus changes; the copy does not.
+    expect(loadedFile).not.toBe(fakeFile)
+    expect(loadedFile.name).toBe(fakeFile.name)
+    expect(loadedFile.type).toBe(fakeFile.type)
+    expect(loadedFile.size).toBe(fakeFile.size)
     expect(mediaFileFh.getFile).toHaveBeenCalledTimes(1)
   })
 

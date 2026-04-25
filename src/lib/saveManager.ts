@@ -34,27 +34,38 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string;
       if (!dir) return { ok: false, reason: 'cancelled' }
     }
     try {
-      // Copy media files to media/ subdirectory
+      // Copy media files to media/ subdirectory — sequential to avoid multiple
+      // simultaneous 2GB temp files that saturate disk and freeze the system.
       const skippedFiles: string[] = []
       const mediaDir = await _saveDir!.getDirectoryHandle('media', { create: true })
-      const serializedClips = await Promise.all(clips.map(async ({ file, ...meta }) => {
-        if (!file) return meta
+      const serializedClips: Record<string, unknown>[] = []
+      for (const { file, ...meta } of clips) {
+        if (!file) { serializedClips.push(meta); continue }
         try {
-          const fh = await mediaDir.getFileHandle(file.name, { create: true })
-          const writable = await fh.createWritable()
-          // Write the Blob directly — no arrayBuffer() needed, avoids OOM on large files.
-          await writable.write(file)
-          await writable.close()
-          // Point the store at the project-directory copy so it survives source deletion.
-          const savedFile = await fh.getFile()
-          useAppStore.getState().updateClip(meta.id as string, { file: savedFile })
-          return { ...meta, mediaPath: `media/${file.name}` }
+          // Skip write if an identically-sized file already exists in the media dir.
+          let alreadySaved = false
+          try {
+            const existing = await mediaDir.getFileHandle(file.name)
+            const existingFile = await existing.getFile()
+            if (existingFile.size === file.size) alreadySaved = true
+          } catch { /* file not yet saved, proceed */ }
+
+          if (!alreadySaved) {
+            const fh = await mediaDir.getFileHandle(file.name, { create: true })
+            const writable = await fh.createWritable()
+            await writable.write(file)
+            await writable.close()
+            // Point the store at the project-directory copy.
+            const savedFile = await fh.getFile()
+            useAppStore.getState().updateClip(meta.id as string, { file: savedFile })
+          }
+          serializedClips.push({ ...meta, mediaPath: `media/${file.name}` })
         } catch (e) {
           if (import.meta.env.DEV) console.error('[saveManager] failed to copy', file.name, e)
           skippedFiles.push(file.name)
-          return meta
+          serializedClips.push(meta)
         }
-      }))
+      }
 
       const data = { projectName, projectSettings, segments, textOverlays, bpmConfig, transitions, adjustmentLayers, clips: serializedClips, tracks, savedAt: Date.now() }
       const fh = await _saveDir!.getFileHandle('project.json', { create: true })
@@ -117,8 +128,10 @@ export async function loadProjectFromDir(): Promise<{ ok: boolean; data?: Record
         try {
           const filename = mediaPath.replace(/^media\//, '')
           const fileFh = await md.getFileHandle(filename)
-          // getFile() returns a filesystem-backed File — no need to buffer into RAM.
-          const file = await fileFh.getFile()
+          // Buffer into RAM so FSAPI permission can't expire after tab focus changes.
+          const snap = await fileFh.getFile()
+          const buf = await snap.arrayBuffer()
+          const file = new File([buf], snap.name, { type: snap.type, lastModified: snap.lastModified })
           return { ...clip, file }
         } catch {
           return clip

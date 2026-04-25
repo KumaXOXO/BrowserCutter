@@ -35,6 +35,7 @@ export interface Segment {
   outPoint: number         // seconds from clip start
   volume?: number          // 0–1, default 1.0
   speed?: number           // 0.25–4.0, default 1.0
+  rotation?: number        // degrees, default 0
   effects?: Effect[]
   hidden?: boolean         // if true, skip in preview and export
   muted?: boolean          // if true, suppress audio for this segment

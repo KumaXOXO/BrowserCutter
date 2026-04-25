@@ -116,6 +116,7 @@ export function activateClip(
   const video = pool.ensure(clip.id, clip.file)
   pool.pauseAllExcept(clip.id)
   pool.showOnly(clip.id)
+  pool.applyTransform(clip.id, seg.rotation ?? 0)
   seekAndPlay(video, seg, seekTime, masterVolume, cancelPlayRef, playAbortRef, setIsPlaying)
   activeClipIdRef.current = clip.id
 }

@@ -1,6 +1,7 @@
 // src/components/timeline/Timeline.tsx
 import { useState, useEffect, useRef } from 'react'
-import { Film, Volume2, Wand2, Type, ChevronUp, ChevronDown, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight } from 'lucide-react'
+import { Film, Volume2, Wand2, Type, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight } from 'lucide-react'
+import CuttingToolPanel from './CuttingToolPanel'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
 import TextTrack from './TextTrack'
@@ -233,52 +234,6 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         style={{ height: 30, background: 'var(--surface)', borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center gap-2 relative">
-          {/* Cut sub-mode controls — visible when cut mode is active */}
-          {timelineMode === 'cut' && (
-            <div className="flex items-center gap-1" style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 6 }}>
-              <button
-                title="Free cut — click anywhere on a clip to split at that point"
-                onClick={() => setCutSubMode('free')}
-                className="text-xs rounded cursor-pointer transition-all duration-150"
-                style={{
-                  padding: '2px 6px', fontWeight: 600,
-                  color: cutSubMode === 'free' ? '#F43F5E' : 'var(--muted2)',
-                  background: cutSubMode === 'free' ? 'rgba(225,29,72,0.1)' : 'transparent',
-                  border: `1px solid ${cutSubMode === 'free' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
-                }}
-              >
-                FREE
-              </button>
-              <button
-                title="Grid cut — split clip into equal parts"
-                onClick={() => setCutSubMode('grid')}
-                className="text-xs rounded cursor-pointer transition-all duration-150"
-                style={{
-                  padding: '2px 6px', fontWeight: 600,
-                  color: cutSubMode === 'grid' ? '#F43F5E' : 'var(--muted2)',
-                  background: cutSubMode === 'grid' ? 'rgba(225,29,72,0.1)' : 'transparent',
-                  border: `1px solid ${cutSubMode === 'grid' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
-                }}
-              >
-                GRID
-              </button>
-              {cutSubMode === 'grid' && (
-                <input
-                  type="number"
-                  min={2}
-                  max={64}
-                  value={cutGridParts}
-                  title="Number of equal parts (2–64)"
-                  onChange={(e) => setCutGridParts(Number(e.target.value))}
-                  style={{
-                    width: 42, fontSize: 10, textAlign: 'center',
-                    background: 'transparent', border: '1px solid var(--border-subtle)',
-                    color: 'var(--muted2)', borderRadius: 4, padding: '2px 4px', outline: 'none',
-                  }}
-                />
-              )}
-            </div>
-          )}
 
           <button
             title={projectSettings.snapToBeat ? 'Snap: Grid — clips snap to beat. Click for Free.' : 'Snap: Free — clips move freely. Click for Grid.'}
@@ -421,6 +376,14 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
 
       {/* Scrollable tracks */}
       <div ref={scrollRef} className="flex-1 overflow-auto relative">
+        {/* Cutting tool panel — floats in top-right corner */}
+        <CuttingToolPanel
+          visible={timelineMode === 'cut'}
+          cutSubMode={cutSubMode}
+          cutGridParts={cutGridParts}
+          onSubMode={setCutSubMode}
+          onGridParts={setCutGridParts}
+        />
         <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} zoom={zoom} />
         <div style={{ position: 'relative' }}>
           {/* Playhead line — fully draggable in playhead mode */}

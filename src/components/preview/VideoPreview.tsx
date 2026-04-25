@@ -122,7 +122,9 @@ export default function VideoPreview() {
     return 0
   }, [activeSeg, playheadPosition, transitions])
 
-  // Load video into pool when clip changes (paused state only)
+  // Load video into pool when clip changes or when pausing.
+  // isPlaying is in the dependency array so that pausing mid-transition re-shows
+  // the correct clip (the RAF loop may have hidden the previous one already).
   useEffect(() => {
     if (isPlaying) return
     const pool = poolRef.current
@@ -134,7 +136,13 @@ export default function VideoPreview() {
     pool.showOnly(activeClip.id)
     activeClipIdRef.current = activeClip.id
     pool.applyFilter(activeClip.id, buildCSSFilter(activeSeg?.effects ?? []) || '')
-  }, [activeClip?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    pool.applyTransform(activeClip.id, activeSeg?.rotation ?? 0)
+    // Seek to the exact paused frame so the display is never left mid-transition.
+    const video = pool.get(activeClip.id)
+    if (video && activeSeg) {
+      video.currentTime = activeSeg.inPoint + (playheadPosition - activeSeg.startOnTimeline) * (activeSeg.speed ?? 1)
+    }
+  }, [activeClip?.id, isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load image blob URL for image clips
   useEffect(() => {
@@ -194,14 +202,17 @@ export default function VideoPreview() {
     audioRef.current.volume = Math.min(1, (activeAudioSeg.volume ?? 1) * masterVolume)
   }, [activeAudioSeg?.id, activeAudioSeg?.volume, masterVolume]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply CSS filter when effects change (paused)
+  // Apply CSS filter and rotation when effects/rotation change (paused)
   useEffect(() => {
     const pool = poolRef.current
     if (!pool || !activeSeg || isPlaying) return
     pool.clearAllFilters()
     const clipId = activeClipIdRef.current
-    if (clipId) pool.applyFilter(clipId, buildCSSFilter(activeSeg.effects ?? []) || '')
-  }, [activeSeg?.effects]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (clipId) {
+      pool.applyFilter(clipId, buildCSSFilter(activeSeg.effects ?? []) || '')
+      pool.applyTransform(clipId, activeSeg.rotation ?? 0)
+    }
+  }, [activeSeg?.effects, activeSeg?.rotation]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // RAF playback loop
   useEffect(() => {
@@ -305,6 +316,7 @@ export default function VideoPreview() {
         pool.showOnly(startClip.id)
         activeClipIdRef.current = startClip.id
         pool.applyFilter(startClip.id, buildCSSFilter(startSeg!.effects ?? []) || '')
+        pool.applyTransform(startClip.id, startSeg!.rotation ?? 0)
         const targetTime = startSeg!.inPoint + (playheadPosition - startSeg!.startOnTimeline) * Math.max(0.01, startSeg!.speed ?? 1)
         if (Math.abs(video.currentTime - targetTime) > 0.05) video.currentTime = targetTime
         cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
