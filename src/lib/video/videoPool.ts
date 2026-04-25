@@ -5,7 +5,7 @@ interface PoolEntry {
   element: HTMLVideoElement
 }
 
-const BASE_STYLE = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:transparent;display:none;opacity:0'
+const BASE_STYLE = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:transparent;display:block;opacity:0;pointer-events:none'
 
 export class ClipVideoPool {
   private entries = new Map<string, PoolEntry>()
@@ -13,8 +13,9 @@ export class ClipVideoPool {
   private objectFit: 'contain' | 'fill' = 'contain'
 
   private static hideElement(el: HTMLVideoElement): void {
-    el.style.display = 'none'
+    el.style.display = 'block'
     el.style.opacity = '0'
+    el.style.pointerEvents = 'none'
     el.style.transform = ''
     el.style.clipPath = ''
   }
@@ -49,6 +50,7 @@ export class ClipVideoPool {
       if (id === clipId) {
         entry.element.style.display = 'block'
         entry.element.style.opacity = '1'
+        entry.element.style.pointerEvents = 'auto'
       } else {
         ClipVideoPool.hideElement(entry.element)
       }
@@ -59,6 +61,7 @@ export class ClipVideoPool {
     for (const [id, entry] of this.entries) {
       if (id === clipIdA || id === clipIdB) {
         entry.element.style.display = 'block'
+        entry.element.style.pointerEvents = 'auto'
       } else {
         ClipVideoPool.hideElement(entry.element)
       }

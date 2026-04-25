@@ -18,7 +18,7 @@ export default function ThumbnailLayer({ clipId, file, inPoint }: Props) {
       if (!cancelled) setUrl(result)
     })
     return () => { cancelled = true }
-  }, [clipId, inPoint]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clipId, inPoint, !!file]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!url) return null
 

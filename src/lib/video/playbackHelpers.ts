@@ -121,6 +121,8 @@ export function activateClip(
   activeClipIdRef.current = clip.id
 }
 
+const PRESEEKED_SNAP_S = 0.05
+
 export function seekAndPlay(
   video: HTMLVideoElement,
   seg: Segment,
@@ -130,10 +132,13 @@ export function seekAndPlay(
   playAbortRef: { current: { cancelled: boolean } },
   setIsPlaying: (playing: boolean) => void,
 ): void {
-  video.currentTime = seekTime
   video.volume = Math.min(1, (seg.volume ?? 1) * masterVolume)
   video.playbackRate = seg.speed ?? 1
   video.muted = seg.muted ?? false
   playAbortRef.current = { cancelled: false }
+  // Skip seek if already positioned by pre-seek — avoids re-triggering 'seeking' at swap time.
+  if (video.seeking || Math.abs(video.currentTime - seekTime) > PRESEEKED_SNAP_S) {
+    video.currentTime = seekTime
+  }
   cancelPlayRef.current = playWhenReady(video, () => setIsPlaying(false), playAbortRef.current)
 }

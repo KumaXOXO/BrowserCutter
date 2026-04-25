@@ -66,6 +66,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
   // Move drag: mousedown on body
   const handleBodyMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Always select the clicked segment so the inspector opens regardless of mode.
+    if (timelineMode !== 'cut') setSelectedElement({ type: 'segment', id: segment.id })
     if (timelineMode === 'playhead') return  // let event bubble to track for playhead jump
 
     e.stopPropagation()
@@ -119,9 +121,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
     }
 
     // Normal click: single select and drag (with cross-timeline track detection)
+    // setSelectedElement already called at top of handler
     const multiIds = selectedSegmentIds.includes(segment.id) ? selectedSegmentIds : [segment.id]
-    setSelectedElement({ type: 'segment', id: segment.id })
-    // Keep multi-selection visible during and after drag
 
     // Push one undo snapshot before drag begins (not inside mousemove to avoid flooding)
     pushHistory()

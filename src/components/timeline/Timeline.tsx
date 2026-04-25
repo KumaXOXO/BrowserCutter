@@ -1,7 +1,6 @@
 // src/components/timeline/Timeline.tsx
 import { useState, useEffect, useRef } from 'react'
 import { Film, Volume2, Wand2, Type, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight, ChevronUp, ChevronDown } from 'lucide-react'
-import CuttingToolPanel from './CuttingToolPanel'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
 import TextTrack from './TextTrack'
@@ -11,6 +10,7 @@ import { PX_PER_SEC } from './ClipBlock'
 import type { TimelineTrack } from '../../types'
 
 const TRACK_LABEL_WIDTH = 78
+const GRID_VALUES = [2, 4, 8, 16, 32, 64, 128]
 
 interface Props {
   height?: number
@@ -48,6 +48,10 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
     projectSettings, updateProjectSettings,
     bpmConfig, updateBpmConfig,
   } = useAppStore()
+
+  const currentCutIdx = GRID_VALUES.indexOf(cutGridParts)
+  const stepCutUp = () => { if (currentCutIdx < GRID_VALUES.length - 1) setCutGridParts(GRID_VALUES[currentCutIdx + 1]) }
+  const stepCutDown = () => { if (currentCutIdx > 0) setCutGridParts(GRID_VALUES[currentCutIdx - 1]) }
 
   // Shift+Mousewheel zoom
   useEffect(() => {
@@ -346,6 +350,78 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
             <ModeBtn active={timelineMode === 'cut'} title="Cut Mode — click a clip to split at playhead" onClick={() => setTimelineMode('cut')}>
               <Scissors size={10} />
             </ModeBtn>
+
+            {/* Inline cut sub-mode controls — animate in when cut mode is active */}
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                overflow: 'hidden',
+                maxWidth: timelineMode === 'cut' ? 140 : 0,
+                opacity: timelineMode === 'cut' ? 1 : 0,
+                transition: 'max-width 200ms ease, opacity 150ms ease',
+                marginLeft: timelineMode === 'cut' ? 4 : 0,
+              }}
+            >
+              {/* FREE: single cut line icon */}
+              <button
+                title="Free cut — click anywhere on a clip to split there"
+                onClick={() => setCutSubMode('free')}
+                style={{
+                  background: cutSubMode === 'free' ? 'rgba(225,29,72,0.15)' : 'transparent',
+                  border: `1px solid ${cutSubMode === 'free' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
+                  borderRadius: 4, padding: '2px 6px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: cutSubMode === 'free' ? '#F43F5E' : 'var(--muted2)',
+                }}
+              >
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, lineHeight: 1 }}>|</span>
+              </button>
+
+              {/* GRID: multiple cut lines icon */}
+              <button
+                title="Grid cut — split clip into equal parts"
+                onClick={() => setCutSubMode('grid')}
+                style={{
+                  background: cutSubMode === 'grid' ? 'rgba(225,29,72,0.15)' : 'transparent',
+                  border: `1px solid ${cutSubMode === 'grid' ? 'rgba(225,29,72,0.55)' : 'var(--border-subtle)'}`,
+                  borderRadius: 4, padding: '2px 5px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: cutSubMode === 'grid' ? '#F43F5E' : 'var(--muted2)',
+                }}
+              >
+                <span style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: 900, lineHeight: 1, letterSpacing: 1 }}>|||</span>
+              </button>
+
+              {/* Parts stepper — only visible in grid sub-mode */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  overflow: 'hidden',
+                  maxWidth: cutSubMode === 'grid' ? 70 : 0,
+                  opacity: cutSubMode === 'grid' ? 1 : 0,
+                  transition: 'max-width 180ms ease, opacity 140ms ease',
+                  marginLeft: cutSubMode === 'grid' ? 2 : 0,
+                }}
+              >
+                <button onClick={stepCutDown} disabled={currentCutIdx <= 0}
+                  style={{ background: 'transparent', border: 'none', cursor: currentCutIdx > 0 ? 'pointer' : 'not-allowed',
+                    color: 'var(--muted2)', opacity: currentCutIdx > 0 ? 0.9 : 0.25, padding: '2px 1px', display: 'flex' }}
+                  title="Fewer parts"
+                >
+                  <ChevronDown size={11} />
+                </button>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#F43F5E', minWidth: 22, textAlign: 'center', userSelect: 'none' }}>
+                  {cutGridParts}
+                </span>
+                <button onClick={stepCutUp} disabled={currentCutIdx >= GRID_VALUES.length - 1}
+                  style={{ background: 'transparent', border: 'none', cursor: currentCutIdx < GRID_VALUES.length - 1 ? 'pointer' : 'not-allowed',
+                    color: 'var(--muted2)', opacity: currentCutIdx < GRID_VALUES.length - 1 ? 0.9 : 0.25, padding: '2px 1px', display: 'flex' }}
+                  title="More parts"
+                >
+                  <ChevronUp size={11} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -376,14 +452,6 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
 
       {/* Scrollable tracks */}
       <div ref={scrollRef} className="flex-1 overflow-auto relative">
-        {/* Cutting tool panel — floats in top-right corner */}
-        <CuttingToolPanel
-          visible={timelineMode === 'cut'}
-          cutSubMode={cutSubMode}
-          cutGridParts={cutGridParts}
-          onSubMode={setCutSubMode}
-          onGridParts={setCutGridParts}
-        />
         <TimeRuler trackLabelWidth={TRACK_LABEL_WIDTH} zoom={zoom} />
         <div style={{ position: 'relative' }}>
           {/* Playhead line — fully draggable in playhead mode */}

@@ -16,7 +16,17 @@ export async function getThumbnail(clipId: string, file: File, inPoint: number):
   const existing = inFlight.get(key)
   if (existing) return existing
 
-  const promise = extractFrame(file, inPoint).then((url) => {
+  const attempt = (delay = 0): Promise<string | null> =>
+    new Promise((resolve) => setTimeout(resolve, delay))
+      .then(() => extractFrame(file, inPoint))
+      .then((url) => {
+        if (url) return url
+        // Single retry after 2s — covers queue congestion and slow-loading codecs.
+        if (delay === 0) return attempt(2000)
+        return null
+      })
+
+  const promise = attempt().then((url) => {
     if (url) {
       if (cache.size >= CACHE_MAX) {
         const oldest = cache.keys().next().value
