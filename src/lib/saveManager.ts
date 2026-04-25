@@ -55,9 +55,8 @@ export async function saveProjectFile(): Promise<{ ok: boolean; reason?: string;
             const writable = await fh.createWritable()
             await writable.write(file)
             await writable.close()
-            // Point the store at the project-directory copy.
-            const savedFile = await fh.getFile()
-            useAppStore.getState().updateClip(meta.id as string, { file: savedFile })
+            // Keep the in-memory File reference — calling fh.getFile() would replace it
+            // with an FSAPI snapshot that expires after tab focus changes.
           }
           serializedClips.push({ ...meta, mediaPath: `media/${file.name}` })
         } catch (e) {
