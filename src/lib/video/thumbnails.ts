@@ -52,9 +52,9 @@ function releaseSlot() {
 async function extractFrame(file: File, inPoint: number): Promise<string | null> {
   await acquireSlot()
   let objectUrl: string | null = null
+  const video = document.createElement('video')
   try {
     objectUrl = URL.createObjectURL(file)
-    const video = document.createElement('video')
     video.preload = 'metadata'
     video.muted = true
 

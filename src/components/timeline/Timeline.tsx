@@ -1,6 +1,6 @@
 // src/components/timeline/Timeline.tsx
 import { useState, useEffect, useRef } from 'react'
-import { Film, Volume2, Wand2, Type, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight } from 'lucide-react'
+import { Film, Volume2, Wand2, Type, Eye, EyeOff, VolumeX, Trash2, MousePointer2, Move, Scissors, ArrowLeftRight, ChevronUp, ChevronDown } from 'lucide-react'
 import CuttingToolPanel from './CuttingToolPanel'
 import TimeRuler from './TimeRuler'
 import Track from './Track'
