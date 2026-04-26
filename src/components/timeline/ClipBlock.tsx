@@ -358,8 +358,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       {/* Waveform canvas — z-index 2, all clip types */}
       <WaveformCanvas clipId={clip.id} file={clip.file ?? null} />
 
-      {/* Left trim handle — only shown when resize is enabled */}
-      {timelineMode === 'selection' && resizeEnabled && (
+      {/* Left trim handle — only shown when resize is enabled and clip is wide enough */}
+      {timelineMode === 'selection' && resizeEnabled && width >= 20 && (
         <div
           onMouseDown={handleLeftTrimMouseDown}
           style={{
@@ -416,8 +416,8 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         </span>
       )}
 
-      {/* Right trim handle — only shown when resize is enabled */}
-      {timelineMode === 'selection' && resizeEnabled && (
+      {/* Right trim handle — only shown when resize is enabled and clip is wide enough */}
+      {timelineMode === 'selection' && resizeEnabled && width >= 20 && (
         <div
           onMouseDown={handleRightTrimMouseDown}
           style={{
