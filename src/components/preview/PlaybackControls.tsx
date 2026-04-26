@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { formatTime } from '../../lib/utils'
 
 export default function PlaybackControls() {
-  const { isPlaying, playheadPosition, segments, masterVolume, setIsPlaying, setPlayheadPosition, setMasterVolume, undo, redo, canUndo, canRedo } = useAppStore()
+  const { isPlaying, playheadPosition, segments, masterVolume, setIsPlaying, setPlayheadPosition, setMasterVolume } = useAppStore()
 
   // Include ALL segments (all tracks) so audio-only timelines show correct duration
   const totalDuration = segments
@@ -12,8 +12,8 @@ export default function PlaybackControls() {
 
   const progress = totalDuration > 0 ? Math.min(100, (playheadPosition / totalDuration) * 100) : 0
 
-  const handleUndo = () => { setIsPlaying(false); undo() }
-  const handleRedo = () => { setIsPlaying(false); redo() }
+  const handleSkipBack = () => { setIsPlaying(false); setPlayheadPosition(0) }
+  const handleSkipForward = () => { setIsPlaying(false); setPlayheadPosition(totalDuration) }
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsPlaying(false)
@@ -27,9 +27,9 @@ export default function PlaybackControls() {
       className="flex items-center gap-2.5 px-4 shrink-0"
       style={{ height: 46, background: 'var(--surface)', borderTop: '1px solid var(--border-subtle)' }}
     >
-      <IconBtn onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!canUndo()}><SkipBack size={14} fill="currentColor" /></IconBtn>
+      <IconBtn onClick={handleSkipBack} title="Go to start"><SkipBack size={14} fill="currentColor" /></IconBtn>
       <PlayBtn isPlaying={isPlaying} onToggle={() => setIsPlaying(!isPlaying)} />
-      <IconBtn onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!canRedo()}><SkipForward size={14} fill="currentColor" /></IconBtn>
+      <IconBtn onClick={handleSkipForward} title="Go to end"><SkipForward size={14} fill="currentColor" /></IconBtn>
       <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted-subtle)' }}>{formatTime(playheadPosition)}</span>
       <SeekBar progress={progress} onSeek={handleSeek} />
       <span className="text-xs font-mono shrink-0" style={{ color: 'var(--muted-subtle)' }}>{formatTime(totalDuration)}</span>

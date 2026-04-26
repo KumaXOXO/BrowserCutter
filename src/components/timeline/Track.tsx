@@ -117,7 +117,7 @@ export default function Track({ trackIndex, trackType, label, icon, height, zoom
         onClick={(e) => {
           // Deselect only on a clean click (no drag) in empty track area.
           // Using onClick instead of onMouseDown so dragging clips doesn't clear selection.
-          if (timelineMode === 'selection' && e.target === e.currentTarget) {
+          if (timelineMode === 'selection' && !(e.target as Element).closest('[data-segment-id]')) {
             setSelectedElement(null)
             setSelectedSegmentIds([])
           }

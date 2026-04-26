@@ -2,7 +2,7 @@ import type { Segment, Clip, TimelineTrack } from '../../types'
 import type { ClipVideoPool } from './videoPool'
 
 export function videoIndices(tracks: TimelineTrack[]): Set<number> {
-  return new Set(tracks.filter((t) => t.type === 'video' && !t.hidden && !t.muted).map((t) => t.trackIndex))
+  return new Set(tracks.filter((t) => t.type === 'video' && !t.hidden).map((t) => t.trackIndex))
 }
 
 export function audioIndices(tracks: TimelineTrack[]): Set<number> {

@@ -67,7 +67,7 @@ export default function VideoPreview() {
   }, [projectSettings.stretchToFormat])
 
   const videoTrackIdx = useMemo(
-    () => new Set(tracks.filter((t) => t.type === 'video' && !t.hidden && !t.muted).map((t) => t.trackIndex)),
+    () => new Set(tracks.filter((t) => t.type === 'video' && !t.hidden).map((t) => t.trackIndex)),
     [tracks],
   )
   const audioTrackIdx = useMemo(
@@ -88,6 +88,7 @@ export default function VideoPreview() {
     })[0] ?? null
   }, [segments, playheadPosition, videoTrackIdx, tracks])
   const activeClip = activeSeg ? clips.find((c) => c.id === activeSeg.clipId) ?? null : null
+  const activeTrackMuted = tracks.find((t) => t.trackIndex === activeSeg?.trackIndex)?.muted ?? false
   if (!isPlaying) activeSegRef.current = activeSeg
 
   const activeAudioSeg = useMemo(() => segments.find(
@@ -193,8 +194,8 @@ export default function VideoPreview() {
     if (!video) return
     video.volume = Math.min(1, (activeSeg.volume ?? 1) * masterVolume)
     video.playbackRate = activeSeg.speed ?? 1
-    video.muted = activeSeg.muted ?? false
-  }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed, activeSeg?.muted, masterVolume]) // eslint-disable-line react-hooks/exhaustive-deps
+    video.muted = (activeSeg.muted ?? false) || activeTrackMuted
+  }, [activeSeg?.id, activeSeg?.volume, activeSeg?.speed, activeSeg?.muted, masterVolume, activeTrackMuted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply volume to audio element
   useEffect(() => {

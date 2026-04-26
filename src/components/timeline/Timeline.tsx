@@ -215,6 +215,37 @@ export default function Timeline({ height = 205, isDragging = false }: Props) {
         }
       }
 
+      // Shift+Arrow: move selected clip along grid (left/right) or to adjacent track (up/down)
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey &&
+          (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault()
+        const { tracks: allTracks, updateSegment, isPlaying, setIsPlaying, bpmConfig } = store
+        const anchorId = selectedElement?.id ?? selectedSegmentIds[0]
+        const anchorSeg = segments.find((s) => s.id === anchorId)
+        if (!anchorSeg) return
+
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          const stepSec = (60 / (bpmConfig.bpm || 120)) * (bpmConfig.gridStep ?? 1)
+          const delta = e.key === 'ArrowRight' ? stepSec : -stepSec
+          const newStart = Math.max(0, anchorSeg.startOnTimeline + delta)
+          if (isPlaying) setIsPlaying(false)
+          updateSegment(anchorSeg.id, { startOnTimeline: newStart })
+          return
+        }
+
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          const curPos = allTracks.findIndex((t) => t.trackIndex === anchorSeg.trackIndex)
+          const nextPos = e.key === 'ArrowUp'
+            ? Math.max(0, curPos - 1)
+            : Math.min(allTracks.length - 1, curPos + 1)
+          const targetTrack = allTracks[nextPos]
+          if (!targetTrack || targetTrack.trackIndex === anchorSeg.trackIndex) return
+          if (isPlaying) setIsPlaying(false)
+          updateSegment(anchorSeg.id, { trackIndex: targetTrack.trackIndex })
+          return
+        }
+      }
+
       // Frame step: . = forward, , = back
       if (e.key === '.' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault()

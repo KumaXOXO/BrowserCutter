@@ -325,6 +325,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
 
   return (
     <div
+      data-segment-id={segment.id}
       onMouseDown={handleBodyMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -337,7 +338,7 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
         left, width,
         borderRadius: 5,
         background: showThumbnails && clip.type !== 'audio' ? 'transparent' : bg,
-        cursor: timelineMode === 'playhead' ? 'grab' : timelineMode === 'cut' ? 'crosshair' : 'grab',
+        cursor: timelineMode === 'playhead' ? 'grab' : timelineMode === 'cut' ? 'crosshair' : 'default',
         userSelect: 'none',
         display: 'flex',
         alignItems: 'center',
