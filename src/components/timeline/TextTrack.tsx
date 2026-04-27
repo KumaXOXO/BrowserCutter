@@ -95,8 +95,9 @@ function TextBlock({ overlay, px, isSelected, onSelect, onUpdate }: TextBlockPro
       const { projectSettings: ps, bpmConfig } = useAppStore.getState()
       const curScroll = scrollContainer?.scrollLeft ?? 0
       const beatDur = ps.snapToBeat ? 60 / Math.max(1, bpmConfig.bpm) : 0
+      const off = bpmConfig.offset ?? 0
       const rawStart = Math.max(0, (ev.clientX - trackRect.left + curScroll - offsetX) / px)
-      const newStart = beatDur > 0 ? Math.round(rawStart / beatDur) * beatDur : rawStart
+      const newStart = beatDur > 0 ? off + Math.round((rawStart - off) / beatDur) * beatDur : rawStart
       onUpdate({ startOnTimeline: newStart })
     }
     const handleMouseUp = () => {

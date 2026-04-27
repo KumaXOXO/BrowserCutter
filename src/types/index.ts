@@ -78,6 +78,7 @@ export interface TextOverlay {
 
 export interface BpmConfig {
   bpm: number
+  offset?: number
   mode: BpmMode
   segmentLength: SegmentLength
   outputDuration: number

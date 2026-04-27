@@ -34,10 +34,11 @@ export default function TimeRuler({
     const beatDur = (60 / bpm) * step
     const gap = beatDur * px
     if (gap < 3) return []
-    const count = Math.ceil(totalDur / beatDur)
+    const off = bpmConfig.offset ?? 0
+    const count = Math.ceil((totalDur - off) / beatDur)
     const subDiv = step < 1 ? Math.round(1 / step) : 1
-    return Array.from({ length: count }, (_, i) => ({ sec: i * beatDur, isBeat: step >= 1 || i % subDiv === 0 }))
-  }, [bpmConfig.bpm, bpmConfig.gridStep, px, totalDur, projectSettings.snapToBeat])
+    return Array.from({ length: count }, (_, i) => ({ sec: off + i * beatDur, isBeat: step >= 1 || i % subDiv === 0 }))
+  }, [bpmConfig.bpm, bpmConfig.offset, bpmConfig.gridStep, px, totalDur, projectSettings.snapToBeat])
 
   const loopDragStartXRef = useRef(0)
 
@@ -50,7 +51,8 @@ export default function TimeRuler({
     const bpm = bpmConfig.bpm
     if (!bpm || bpm <= 0) return sec
     const beatDur = 60 / bpm
-    return Math.round(sec / beatDur) * beatDur
+    const off = bpmConfig.offset ?? 0
+    return off + Math.round((sec - off) / beatDur) * beatDur
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {

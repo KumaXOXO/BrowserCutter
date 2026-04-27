@@ -133,7 +133,7 @@ export default function VideoPreview() {
       pool?.hideAll()
       return
     }
-    pool.ensure(activeClip.id, activeClip.file)
+    pool.ensure(activeClip.id, activeClip.proxyFile ?? activeClip.file)
     pool.showOnly(activeClip.id)
     activeClipIdRef.current = activeClip.id
     pool.applyFilter(activeClip.id, buildCSSFilter(activeSeg?.effects ?? []) || '')
@@ -284,7 +284,7 @@ export default function VideoPreview() {
         const clip = clipsRef.current.find((c) => c.id === nextVideoSeg.clipId)
         if (clip?.type !== 'image') {
           if (!clip?.file) { setIsPlaying(false); return }
-          const video = pool.ensure(clip.id, clip.file)
+          const video = pool.ensure(clip.id, clip.proxyFile ?? clip.file)
           pool.showOnly(clip.id)
           activeClipIdRef.current = clip.id
           video.currentTime = nextVideoSeg.inPoint
@@ -313,7 +313,7 @@ export default function VideoPreview() {
     if (startSeg) {
       const startClip = clipsRef.current.find((c) => c.id === startSeg!.clipId)
       if (startClip?.type !== 'image' && startClip?.file) {
-        const video = pool.ensure(startClip.id, startClip.file)
+        const video = pool.ensure(startClip.id, startClip.proxyFile ?? startClip.file)
         pool.showOnly(startClip.id)
         activeClipIdRef.current = startClip.id
         pool.applyFilter(startClip.id, buildCSSFilter(startSeg!.effects ?? []) || '')

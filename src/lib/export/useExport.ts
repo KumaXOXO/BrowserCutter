@@ -49,7 +49,7 @@ export function useExport(): ExportState {
     setLabel('Preparing...')
     setErrorMsg('')
 
-    const clipFiles: Record<string, { url: string; name: string }> = {}
+    const clipFiles: Record<string, { url: string; name: string; file?: File }> = {}
     blobUrlsRef.current = []
     const blobUrls = blobUrlsRef.current
     const needed = new Set(videoSegs.map((s) => s.clipId))
@@ -72,7 +72,7 @@ export function useExport(): ExportState {
         await clip.file.slice(0, 1).arrayBuffer()
         const url = URL.createObjectURL(clip.file)
         blobUrls.push(url)
-        clipFiles[clip.id] = { url, name: clip.name }
+        clipFiles[clip.id] = { url, name: clip.name, file: clip.file }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'NotAllowedError') notAllowed.push(clip.name)
         else if (e instanceof DOMException && e.name === 'NotReadableError') notReadable.push(clip.name)

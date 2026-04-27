@@ -267,6 +267,13 @@ export function startVideoTick(params: VideoTickParams): void {
         currentPlayhead < s.startOnTimeline + (s.outPoint - s.inPoint),
     )
     if (audioSeg && audioRef.current.paused && audioRef.current.src) {
+      const audioClip = clipsRef.current.find(c => c.id === audioSeg.clipId)
+      if (audioClip?.file) {
+        const url = getClipUrl(audioClip.id, audioClip.file)
+        if (audioRef.current.src !== url) audioRef.current.src = url
+        audioRef.current.currentTime = audioSeg.inPoint + (currentPlayhead - audioSeg.startOnTimeline)
+        audioRef.current.volume = Math.min(1, (audioSeg.volume ?? 1) * masterVolumeRef.current)
+      }
       audioRef.current.play().catch(() => {})
     } else if (!audioSeg && !audioRef.current.paused) {
       audioRef.current.pause()

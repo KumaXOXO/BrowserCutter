@@ -124,8 +124,8 @@ export default function BpmPanel() {
               if (!targetClip) return
               setDetecting(true)
               try {
-                const detected = await detectBpm(targetClip.file)
-                if (mountedRef.current) updateBpmConfig({ bpm: detected })
+                const { bpm, offset } = await detectBpm(targetClip.file)
+                if (mountedRef.current) updateBpmConfig({ bpm, offset })
               } catch (err) {
                 if (import.meta.env.DEV) console.error('[BpmDetector]', err)
               } finally {

@@ -4,13 +4,15 @@ import { toBlobURL } from '@ffmpeg/util'
 import type { Transition, AdjustmentLayer } from '../../types'
 import { buildFilterComplex } from './exportWorkerUtils'
 
+const MOUNT_THRESHOLD = 200 * 1024 * 1024 // 200 MB — use WORKERFS above this
+
 export interface ExportRequest {
   segments: Array<{
     id: string; clipId: string; trackIndex: number
     startOnTimeline: number; inPoint: number; outPoint: number
     volume?: number; speed?: number; effects?: import('../../types').Effect[]
   }>
-  clipFiles: Record<string, { url: string; name: string }>
+  clipFiles: Record<string, { url: string; name: string; file?: File }>
   fps: number
   resolution: string
   transitions: Transition[]
@@ -50,10 +52,15 @@ async function runExport(req: ExportRequest) {
   post({ type: 'progress', value: 0.01, label: 'Loading FFmpeg...' })
 
   const base = new URL('/', self.location.href).href
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${base}ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${base}ffmpeg-core.wasm`, 'application/wasm'),
-  })
+  try {
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${base}ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${base}ffmpeg-core.wasm`, 'application/wasm'),
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`FFmpeg failed to load. Make sure the app is served via HTTP (not file://). Details: ${msg}`)
+  }
 
   post({ type: 'progress', value: 0.05, label: 'Writing clips...' })
 
@@ -63,18 +70,31 @@ async function runExport(req: ExportRequest) {
 
   if (v1Segs.length === 0) throw new Error('No video clips on the timeline.')
 
-  // Write clips one at a time so only one ArrayBuffer lives in JS heap at once.
-  // Pre-loading all buffers simultaneously caused ErrnoError on large projects.
+  // For large files (>200 MB), mount via WORKERFS to avoid copying into WASM memory.
+  // For small files, use the existing fetch+writeFile path.
+  const mountedDirs: string[] = []
   const writtenFiles = new Set<string>()
+  const clipPathMap = new Map<string, string>()
+
   for (const seg of v1Segs) {
     const cd = req.clipFiles[seg.clipId]
     if (!cd) throw new Error(`Missing clip data for segment ${seg.id}`)
     const ext = cd.name.split('.').pop()?.toLowerCase() ?? 'mp4'
     const fname = `clip_${seg.clipId}.${ext}`
-    if (!writtenFiles.has(fname)) {
+
+    if (clipPathMap.has(seg.clipId)) continue
+
+    if (cd.file && cd.file.size > MOUNT_THRESHOLD) {
+      const mountPoint = `/mount_${seg.clipId}`
+      await ffmpeg.createDir(mountPoint)
+      await ffmpeg.mount('WORKERFS' as never, { files: [cd.file] } as never, mountPoint)
+      mountedDirs.push(mountPoint)
+      clipPathMap.set(seg.clipId, `${mountPoint}/${cd.file.name}`)
+    } else if (!writtenFiles.has(fname)) {
       const buf = await fetch(cd.url).then((r) => r.arrayBuffer())
       await ffmpeg.writeFile(fname, new Uint8Array(buf))
       writtenFiles.add(fname)
+      clipPathMap.set(seg.clipId, fname)
     }
   }
 
@@ -93,17 +113,14 @@ async function runExport(req: ExportRequest) {
 
   post({ type: 'progress', value: 0.25, label: 'Encoding video...' })
 
-  // Always use filter_complex so each segment gets setpts=PTS-STARTPTS,
-  // preventing timestamp discontinuities when segments are non-contiguous in the source file.
   // Deduplicate: one -i per unique clip (not per segment) to avoid WASM OOM
   const clipInputMap = new Map<string, number>()
   const inputs: string[] = []
   for (const seg of v1Segs) {
     if (!clipInputMap.has(seg.clipId)) {
-      const cd = req.clipFiles[seg.clipId]
-      const ext = cd.name.split('.').pop()?.toLowerCase() ?? 'mp4'
+      const path = clipPathMap.get(seg.clipId)!
       clipInputMap.set(seg.clipId, clipInputMap.size)
-      inputs.push('-i', `clip_${seg.clipId}.${ext}`)
+      inputs.push('-i', path)
     }
   }
   const segInputIdx = v1Segs.map((s) => clipInputMap.get(s.clipId)!)
@@ -121,7 +138,7 @@ async function runExport(req: ExportRequest) {
   ])
 
   // If encoding failed (e.g. clip has no audio stream), the WASM may be in a
-  // corrupted state. Terminate, reload, re-write clips, then retry video-only.
+  // corrupted state. Terminate, reload, re-write/re-mount clips, then retry video-only.
   if (exitCode !== 0) {
     post({ type: 'progress', value: 0.25, label: 'Retrying (video only)...' })
 
@@ -131,24 +148,45 @@ async function runExport(req: ExportRequest) {
       wasmURL: await toBlobURL(`${base}ffmpeg-core.wasm`, 'application/wasm'),
     })
 
-    const rewritten = new Set<string>()
+    mountedDirs.length = 0
+    clipPathMap.clear()
+    const retryInputs: string[] = []
+    const retryClipInputMap = new Map<string, number>()
+
     for (const seg of v1Segs) {
       const cd = req.clipFiles[seg.clipId]
       if (!cd) continue
+      if (clipPathMap.has(seg.clipId)) continue
+
       const ext = cd.name.split('.').pop()?.toLowerCase() ?? 'mp4'
       const fname = `clip_${seg.clipId}.${ext}`
-      if (!rewritten.has(fname)) {
+
+      if (cd.file && cd.file.size > MOUNT_THRESHOLD) {
+        const mountPoint = `/mount_${seg.clipId}`
+        await ffmpeg.createDir(mountPoint)
+        await ffmpeg.mount('WORKERFS' as never, { files: [cd.file] } as never, mountPoint)
+        mountedDirs.push(mountPoint)
+        clipPathMap.set(seg.clipId, `${mountPoint}/${cd.file.name}`)
+      } else {
         const buf = await fetch(cd.url).then((r) => r.arrayBuffer())
         await ffmpeg.writeFile(fname, new Uint8Array(buf))
-        rewritten.add(fname)
+        clipPathMap.set(seg.clipId, fname)
       }
     }
 
+    for (const seg of v1Segs) {
+      if (!retryClipInputMap.has(seg.clipId)) {
+        retryClipInputMap.set(seg.clipId, retryClipInputMap.size)
+        retryInputs.push('-i', clipPathMap.get(seg.clipId)!)
+      }
+    }
+    const retrySegIdx = v1Segs.map((s) => retryClipInputMap.get(s.clipId)!)
+
     const { filterComplex: videoOnlyFC, videoOut: vOut2 } = buildFilterComplex(
-      v1Segs, req.transitions, req.adjustmentLayers, width, height, segInputIdx, true,
+      v1Segs, req.transitions, req.adjustmentLayers, width, height, retrySegIdx, true,
     )
     exitCode = await ffmpeg.exec([
-      ...inputs,
+      ...retryInputs,
       '-filter_complex', videoOnlyFC,
       '-map', `[${vOut2}]`, '-an',
       ...buildEncodeArgs(format, quality, req.fps),
@@ -157,6 +195,9 @@ async function runExport(req: ExportRequest) {
   }
 
   if (exitCode !== 0) {
+    for (const mp of mountedDirs) {
+      try { await ffmpeg.unmount(mp) } catch { /* ignore */ }
+    }
     throw new Error(`Export failed: ${lastLog || 'FFmpeg exited with code ' + exitCode}`)
   }
 
@@ -164,6 +205,10 @@ async function runExport(req: ExportRequest) {
 
   const data = await ffmpeg.readFile(outputFile)
   const buffer = (data as Uint8Array).buffer
+
+  for (const mp of mountedDirs) {
+    try { await ffmpeg.unmount(mp) } catch { /* ignore */ }
+  }
 
   post({ type: 'done', buffer } satisfies WorkerMessage, [buffer])
 }

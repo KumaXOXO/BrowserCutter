@@ -151,8 +151,9 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       const { projectSettings: ps, bpmConfig: bc } = useAppStore.getState()
       const beatDuration = ps.snapToBeat ? 60 / Math.max(1, bc.bpm) : 0
       const snapUnit = beatDuration > 0 ? beatDuration * (bc.gridStep ?? 1) : 0
+      const off = bc.offset ?? 0
       const rawStart = Math.max(0, (ev.clientX - trackRect.left + curScroll - offsetX) / px)
-      const newStart = snapUnit > 0 ? Math.round(rawStart / snapUnit) * snapUnit : rawStart
+      const newStart = snapUnit > 0 ? off + Math.round((rawStart - off) / snapUnit) * snapUnit : rawStart
       const primaryDelta = newStart - (startPositions[segment.id] ?? segment.startOnTimeline)
 
       const els = document.elementsFromPoint(ev.clientX, ev.clientY)
@@ -219,12 +220,12 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       const { projectSettings: ps, bpmConfig: bc } = useAppStore.getState()
       const beatDuration = ps.snapToBeat ? 60 / Math.max(1, bc.bpm) : 0
       const snapUnit = beatDuration > 0 ? beatDuration * (bc.gridStep ?? 1) : 0
+      const off = bc.offset ?? 0
       const dSec = (ev.clientX - startX) / px
       let newInPoint = Math.max(0, Math.min(segRef.current.outPoint - 0.1, initialInPoint + dSec))
       if (snapUnit > 0) {
-        // Snap startOnTimeline to grid, derive inPoint from that
         const rawStart = Math.max(0, initialStart + (newInPoint - initialInPoint))
-        const snappedStart = Math.round(rawStart / snapUnit) * snapUnit
+        const snappedStart = off + Math.round((rawStart - off) / snapUnit) * snapUnit
         newInPoint = Math.max(0, Math.min(segRef.current.outPoint - 0.1, initialInPoint + (snappedStart - initialStart)))
       }
       const delta = newInPoint - initialInPoint
@@ -251,13 +252,13 @@ export default function ClipBlock({ segment, clip, zoom }: Props) {
       const { projectSettings: ps, bpmConfig: bc } = useAppStore.getState()
       const beatDuration = ps.snapToBeat ? 60 / Math.max(1, bc.bpm) : 0
       const snapUnit = beatDuration > 0 ? beatDuration * (bc.gridStep ?? 1) : 0
+      const off = bc.offset ?? 0
       const dSec = (ev.clientX - startX) / px
       const maxOut = (clip.type === 'video' || clip.type === 'audio') ? clip.duration : Infinity
       let newOutPoint = Math.max(segRef.current.inPoint + 0.1, Math.min(maxOut, initialOutPoint + dSec))
       if (snapUnit > 0) {
-        // Snap outPoint to the nearest grid position relative to segment start
         const outOnTimeline = segRef.current.startOnTimeline + (newOutPoint - segRef.current.inPoint) / Math.max(0.01, segRef.current.speed ?? 1)
-        const snappedTimeline = Math.round(outOnTimeline / snapUnit) * snapUnit
+        const snappedTimeline = off + Math.round((outOnTimeline - off) / snapUnit) * snapUnit
         newOutPoint = Math.max(segRef.current.inPoint + 0.1, Math.min(maxOut,
           segRef.current.inPoint + (snappedTimeline - segRef.current.startOnTimeline) * Math.max(0.01, segRef.current.speed ?? 1)
         ))

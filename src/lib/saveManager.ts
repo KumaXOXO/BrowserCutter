@@ -121,17 +121,34 @@ export async function loadProjectFromDir(): Promise<{ ok: boolean; data?: Record
     if (mediaDir) {
       const rawClips = json.clips as Array<Record<string, unknown>>
       const md = mediaDir
+
+      // Scan media/proxy/ for existing proxy files
+      let proxyDir: FileSystemDirectoryHandle | null = null
+      try { proxyDir = await md.getDirectoryHandle('proxy') } catch { /* no proxy dir */ }
+      const proxyMap = new Map<string, File>()
+      if (proxyDir) {
+        for await (const [name, handle] of proxyDir as unknown as AsyncIterable<[string, FileSystemHandle]>) {
+          if (handle.kind === 'file' && name.endsWith('_proxy.mp4')) {
+            const file = await (handle as FileSystemFileHandle).getFile()
+            const originalBase = name.replace(/_proxy\.mp4$/, '')
+            proxyMap.set(originalBase, file)
+          }
+        }
+      }
+
       json.clips = await Promise.all(rawClips.map(async (clip) => {
         const mediaPath = clip.mediaPath as string | undefined
         if (!mediaPath) return clip
         try {
           const filename = mediaPath.replace(/^media\//, '')
           const fileFh = await md.getFileHandle(filename)
-          // Buffer into RAM so FSAPI permission can't expire after tab focus changes.
           const snap = await fileFh.getFile()
           const buf = await snap.arrayBuffer()
           const file = new File([buf], snap.name, { type: snap.type, lastModified: snap.lastModified })
-          return { ...clip, file }
+
+          const baseName = filename.replace(/\.[^.]+$/, '')
+          const proxyFile = proxyMap.get(baseName)
+          return proxyFile ? { ...clip, file, proxyFile } : { ...clip, file }
         } catch {
           return clip
         }
